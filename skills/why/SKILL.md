@@ -6,11 +6,13 @@ disable-model-invocation: true
 
 # Why
 
+A skill named in bold or in backticks, or run as `/<name>`, is the file `../<name>/SKILL.md` beside this skill's directory, and a principle named without its prefix is `../principle-<name>/SKILL.md`. Read the file and follow it. Most pstack skills are user-only, so your skill tool cannot load them. Every `delegate_task` call follows the defaults in the Subagents section of `../poteto-mode/SKILL.md`.
+
 Investigate the motivation and intent behind code.
 
 Companion to the `how` skill. `how` answers what the code does and how it works. `why` answers what forces led to its shape.
 
-Each spawn below names a role line in the `pstack-models.mdc` rule and a default. Set `model` to that line's value, or to the default if the rule or the line is missing. Leave `model` unset when the value is `auto` or `inherit-parent`. If the Task tool rejects a slug, use the default and say so. If it rejects the default, use the closest valid slug of the same family from its error message.
+Each spawn below is a `delegate_task` child with `mode: "async"`, and names a role line in `~/.config/pstack/pstack-models.md`. An entry `<providerInstanceId>/<model> (<effort>)` becomes `target: {"providerInstanceId": ..., "model": ..., "options": {"<effort option id>": "<effort>"}}`, with the effort option id `orchestrator_capabilities` lists for that model. Omit `target` when the value is `auto` or `inherit-parent`, or when the file or the line is missing, so the child runs on the parent thread's model. With no file, say so and suggest `/setup-pstack`. If `delegate_task` rejects an entry, use the closest model of the same provider that `orchestrator_capabilities` lists, and say so. The child gets only its brief, so paste each reference file it gets into the brief, or give its absolute path. End the turn after spawning and let the completion notifications wake you.
 
 ## Operating Posture
 
@@ -20,7 +22,7 @@ Operate as a **careful, cautious, and precise investigator**. Be honest about wh
 
 Parse what the user is asking. The **target** is usually a chunk of code, a pattern, a feature, or a named design decision. The **question** is usually a design rationale, a tradeoff, a motivating edge case, an external constraint, dead code, or a broad history sweep.
 
-If the target is vague ("why do we do it this way?" with no clear referent), make your best guess from conversation context (open files, recent edits, cursor location, what was just discussed). State your interpretation briefly so the user can redirect if you're off, then proceed.
+If the target is vague ("why do we do it this way?" with no clear referent), make your best guess from conversation context (open files, recent edits, what was just discussed). State your interpretation briefly so the user can redirect if you're off, then proceed.
 
 ## Step 2. Establish the Code Anchor
 
@@ -61,7 +63,7 @@ Capture this as seed context (file paths, symbols, commits, PR numbers, linked t
 
 ### Discovery
 
-Before spawning investigators, list the available MCPs from the Cursor environment. Use the available-tools map when present. Otherwise inspect the `mcps/` directory Cursor exposes for enabled MCP servers.
+Before spawning investigators, list the available MCPs from your own tool list. Group the MCP tools by server, including tools listed by name only before their schemas load.
 
 Map each available MCP to one evidence category:
 
@@ -77,12 +79,12 @@ Source control is always available through git and `gh`. For the other six, clas
 
 Aim for a complete **coverage map**, not a minimal one. Document the null, don't skip the search.
 
-Launch all matching investigators in a single message so they run concurrently. Don't ask one agent to cover multiple MCPs.
+Launch all matching investigators in a single turn so they run concurrently. Don't ask one agent to cover multiple MCPs.
 
-Subagent config (each):
-- `subagent_type`: `generalPurpose`
-- `model`: the `why investigators` line, default `grok-4.7-xhigh-fast`
-- `readonly`: `false` (agent mode). **Do not use readonly/Ask mode.** It strips MCP access, which disables MCP-backed investigators entirely. Investigators still shouldn't write anything.
+Spawn config (each):
+- `title`: `why investigator: <category>`
+- `target`: the `why investigators` line
+- Mode stays inherited. **Do not pass a weaker runtime or interaction mode.** MCP-backed investigators need their MCP tools. Investigators still shouldn't write anything, so the brief says read-only: inspect only, no writes, no git commands that change state.
 
 Each investigator gets:
 1. The base prompt from `references/investigator-prompt.md`
@@ -122,11 +124,11 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 
 ## Step 4. Synthesize
 
-Spawn one synthesizer subagent:
+Spawn one synthesizer `delegate_task` child:
 
-- `subagent_type`: `generalPurpose`
-- `model`: the `why synthesizer` line, default `claude-opus-5-5-xhigh`
-- `readonly`: `false` (agent mode). The synthesizer's quality check spot-verifies citations, which can require MCP access. Readonly/Ask mode strips MCPs and defeats that.
+- `title`: `why synthesizer`
+- `target`: the `why synthesizer` line
+- Mode stays inherited. The synthesizer's quality check spot-verifies citations, which can require MCP access. A weaker mode defeats that. The brief says read-only: inspect only, no writes, no git commands that change state.
 
 The synthesizer gets:
 1. The investigator findings, including any null results and any categories skipped with justification

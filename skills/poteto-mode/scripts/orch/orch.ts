@@ -80,6 +80,7 @@ interface GateResolveOptions {
 }
 
 interface FrontierSetOptions {
+  readonly chain: string;
   readonly repo?: string;
   readonly prs?: readonly number[];
 }
@@ -472,9 +473,17 @@ function createProgram(io: Io): Command {
 
   const frontier = program
     .command("frontier")
-    .description("manage the Graphite stack frontier")
+    .description("manage the PR stack frontier")
     .action(() => requireSubcommand(program));
-  leaf(frontier, "set", "discover the Graphite stack and set the frontier")
+  leaf(
+    frontier,
+    "set",
+    "set the frontier from a list_thread_pull_requests dump"
+  )
+    .requiredOption(
+      "--chain <file>",
+      "list_thread_pull_requests JSON result"
+    )
     .addOption(
       new Option(
         "--repo <dir>",
@@ -492,6 +501,7 @@ function createProgram(io: Io): Command {
         io,
         (store) =>
           store.frontier.set({
+            chain: options.chain,
             repo: frontierRepo(options),
             prs: options.prs,
           }),

@@ -1,15 +1,48 @@
 #!/usr/bin/env bash
 # Read-only worktree prune audit. Classifies every git worktree by size, merge
-# state, uncommitted work, remote/PR state, and the most recent chat that
-# operated in it. Emits a table sorted by size with a suggested bucket. Never
+# state, uncommitted work, remote/PR state, and the most recent T3 thread
+# that operated in it. Emits a table sorted by size with a suggested bucket. Never
 # deletes anything; deletion stays a human-gated step in the playbook.
 #
-# Usage: worktree-audit.sh [repo-path]   (defaults to the current repo)
+# Usage: worktree-audit.sh [--activity <tsv>] [repo-path]   (defaults to the current repo)
+#   <tsv> has one line per worktree: <absolute worktree path>\t<UTC timestamp>\t<thread id>,
+#   built from t3_thread_list and t3_thread_read. The timestamp is UTC ending in Z, as
+#   t3_thread_read returns it (2026-10-10T12:34:56.789Z). Any other row aborts the audit.
+#   Paths that exist compare by physical path, so /tmp matches /private/tmp.
+#   Repeated paths keep the newest. Without it LAST_CHAT is "-".
 set -u
+# Never take git's optional index locks: the audit must not write to any worktree.
+export GIT_OPTIONAL_LOCKS=0
+
+activity=""
+if [ "${1:-}" = "--activity" ]; then
+	activity="${2:-}"
+	[ -r "$activity" ] || { echo "cannot read activity file: $activity" >&2; exit 1; }
+	# Absolute before the cd below, so a relative path still resolves.
+	activity="$(CDPATH= cd -- "$(dirname -- "$activity")" && pwd -P)/$(basename -- "$activity")"
+	shift 2
+fi
 
 repo="${1:-$(git rev-parse --show-toplevel 2>/dev/null)}"
 [ -z "$repo" ] && { echo "not in a git repo; pass a repo path" >&2; exit 1; }
 cd "$repo" || exit 1
+
+# Last T3 activity as "path<TAB>epoch<TAB>thread". A malformed row aborts the audit
+# rather than reading as no activity, which could bucket a live worktree as safe.
+acts=""
+if [ -n "$activity" ]; then
+	acts=$(jq -Rr 'select(test("^\\s*$") | not) | split("\t") as $f
+		| if ($f | length) != 3 or $f[0] == "" or $f[2] == ""
+			or ($f[1] | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$") | not)
+		then error("bad row: \(.)") else . end
+		| [($f[0] | sub("/+$"; "")), ($f[1] | sub("\\.[0-9]+"; "") | fromdateiso8601), $f[2]] | @tsv' "$activity") \
+		|| { printf 'activity file rows must be <path>\\t<UTC timestamp ending in Z>\\t<thread id>: %s\n' "$activity" >&2; exit 1; }
+	acts=$(printf '%s\n' "$acts" | while IFS=$'\t' read -r p ts id; do
+		[ -n "$p" ] || continue
+		[ -d "$p" ] && p=$(CDPATH= cd -- "$p" && pwd -P)
+		printf '%s\t%s\t%s\n' "$p" "$ts" "$id"
+	done)
+fi
 
 # Main worktree is the first entry; everything else is a candidate.
 main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
@@ -22,9 +55,6 @@ prs=$(mktemp)
 gh pr list --author "@me" --state all --limit 1000 \
 	--json number,state,headRefName 2>/dev/null > "$prs" || echo "[]" > "$prs"
 
-# Transcripts dir: ~/.cursor/projects/<slugified-repo-path>/agent-transcripts.
-slug=$(printf '%s' "$main_wt" | sed 's#^/##; s#/#-#g')
-transcripts="$HOME/.cursor/projects/$slug/agent-transcripts"
 now=$(date +%s)
 
 printf "SIZE\tAGE\tMERGED\tDIRTY\tREMOTE\tPR\tLAST_CHAT\tBUCKET\tWORKTREE\n"
@@ -60,15 +90,13 @@ git worktree list --porcelain | awk '/^worktree /{print $2}' | while read -r wt;
 		'.[] | select(.headRefName==$b) | "#\(.number)/\(.state)"' "$prs" 2>/dev/null | head -1)
 	[ -z "$pr" ] && pr="-"
 
-	# Most recent chat whose transcript operated in this worktree. Match path
-	# followed by "/" or a quote so glint-482 does not match glint-482-r37.
+	# Most recent T3 thread that ran in this worktree. Exact physical-path match
+	# so glint-482 does not match glint-482-r37.
 	last="-"; last_ts=0
-	if [ -d "$transcripts" ]; then
-		f=$(rg -l -e "${wt}/" -e "${wt}\"" "$transcripts" 2>/dev/null \
-			| xargs stat -f '%m %N' 2>/dev/null | sort -rn | head -1)
-		if [ -n "$f" ]; then last_ts=$(echo "$f" | awk '{print $1}')
-			last=$(date -r "$last_ts" '+%Y-%m-%d' 2>/dev/null); fi
-	fi
+	wt_real=$(CDPATH= cd -- "$wt" 2>/dev/null && pwd -P || printf '%s' "$wt")
+	f=$(printf '%s\n' "$acts" | awk -F'\t' -v p="$wt_real" '$1 == p' | sort -t$'\t' -k2,2 -rn | head -1)
+	if [ -n "$f" ]; then last_ts=$(printf '%s' "$f" | cut -f2)
+		last="$(date -r "$last_ts" '+%Y-%m-%d' 2>/dev/null)/$(printf '%s' "$f" | cut -f3)"; fi
 	recent=$([ "$last_ts" -gt 0 ] 2>/dev/null && [ $(( (now - last_ts) / 86400 )) -le 4 ] && echo yes || echo no)
 
 	case "$dirty" in wip:*) bucket=hold-wip ;; *)

@@ -166,6 +166,7 @@ export interface ResolveGateParams {
 }
 
 export interface SetFrontierParams {
+  readonly chain: string;
   readonly repo: string;
   readonly prs?: readonly number[];
 }
@@ -967,168 +968,278 @@ function countLine(value: Counts): string {
     : entries.map(([name, count]) => `${name}=${count}`).join(", ");
 }
 
-const OPEN_GT_PR_STATUSES = new Set([
-  "Trunk branch locked",
-  "Changes requested",
-  "Waiting on PRs in this stack to merge",
-  "Waiting on downstack merge state",
-  "Draft",
-  "Required checks failed",
-  "Undergoing failure detection",
-  "Merge queue failed on current head commit",
-  "Handed off to merge queue...",
-  "Waiting on downstack",
-  "Merge conflicts",
-  "Needs reviewers",
-  "Needs approvals",
-  "Needs restack",
-  "Queued to merge...",
-  "Ready to merge",
-  "Ready to merge as stack",
-  "Rebasing...",
-  "Waiting on CI...",
-  "Stale, needs rebase onto trunk",
-  "Unresolved comments",
-  "Waiting on required CI",
-  "Waiting to merge...",
-]);
-
-interface GtPullRequest {
-  readonly pr: number;
-  readonly state: FrontierPrState;
+interface ThreadPullRequest {
+  readonly host: string;
+  readonly repository: string;
+  readonly number: number;
+  readonly state: string | null;
+  readonly headBranch: string | null;
 }
 
-interface GtFrontierEntry extends GtPullRequest {
-  readonly branches: string;
+interface ThreadPullRequests {
+  readonly pullRequests: readonly ThreadPullRequest[];
+  readonly chains: readonly (readonly number[])[];
 }
 
-function parseGtPullRequest({
-  branch,
-  detail,
-}: {
-  branch: string;
-  detail: string;
-}): GtPullRequest {
-  const match =
-    /^(?:\[origin\] )?PR #([1-9]\d*)(?: \(([^)\r\n]+)\))?(?: .+)?$/.exec(
-      detail
-    );
-  const pr = Number(match?.[1] ?? 0);
-  if (match === null || !Number.isSafeInteger(pr)) {
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function nullableString(value: unknown): value is string | null {
+  return value === null || (typeof value === "string" && value.length > 0);
+}
+
+function parseThreadPullRequests(
+  raw: string,
+  path: string
+): ThreadPullRequests {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new UserError(`chain file ${path} is not valid JSON`);
+  }
+  if (
+    !isRecord(value) ||
+    !isUnknownArray(value.pullRequests) ||
+    !isUnknownArray(value.chains)
+  ) {
     throw new UserError(
-      `gt info output has an invalid PR row for branch ${branch}: ${detail}`
+      `chain file ${path} must hold the list_thread_pull_requests result`
     );
   }
-  const status = match[2];
-  if (status === "Merged") {
-    return { pr, state: "MERGED" };
+  const pullRequests: ThreadPullRequest[] = [];
+  for (const row of value.pullRequests) {
+    if (
+      !isRecord(row) ||
+      typeof row.host !== "string" ||
+      row.host.length === 0 ||
+      typeof row.repository !== "string" ||
+      row.repository.length === 0 ||
+      !isPositiveInteger(row.number) ||
+      !nullableString(row.state) ||
+      !nullableString(row.headBranch)
+    ) {
+      throw new UserError(`chain file ${path} has an invalid pull request row`);
+    }
+    pullRequests.push({
+      host: row.host,
+      repository: row.repository,
+      number: row.number,
+      state: row.state,
+      headBranch: row.headBranch,
+    });
   }
-  if (status === "Closed") {
-    return { pr, state: "CLOSED" };
+  const chains: (readonly number[])[] = [];
+  for (const chain of value.chains) {
+    if (
+      !isRecord(chain) ||
+      !isUnknownArray(chain.numbers) ||
+      chain.numbers.length === 0 ||
+      !chain.numbers.every(isPositiveInteger)
+    ) {
+      throw new UserError(`chain file ${path} has an invalid chain`);
+    }
+    chains.push(chain.numbers.filter(isPositiveInteger));
   }
-  if (status === undefined || OPEN_GT_PR_STATUSES.has(status)) {
-    return { pr, state: "OPEN" };
-  }
-  throw new UserError(
-    `gt info output has an unknown PR state for branch ${branch}: ${status}`
-  );
+  return { pullRequests, chains };
 }
 
-function parseGtBranches(raw: string): readonly string[] {
-  const branches: string[] = [];
-  const lines = raw.replace(/\r/g, "").split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (line.length === 0) {
-      continue;
-    }
-    const branchMatch =
-      /^(?:│ )*[◯◉] +([^\s]+)((?: \([^()\r\n]*\))*)$/.exec(line);
-    if (branchMatch === null) {
-      throw new UserError(
-        `gt log short output has an unparseable line ${index + 1}: ${JSON.stringify(line)}`
-      );
-    }
-    const branch = branchMatch[1] ?? "";
-    if (branches.includes(branch)) {
-      throw new UserError(
-        `gt log short output contains duplicate branch ${branch}`
-      );
-    }
-    branches.push(branch);
-  }
-  const trunk = branches[0];
-  if (trunk === undefined) {
-    throw new UserError("gt log short output did not contain a stack");
-  }
-  return branches.slice(1);
-}
-
-function graphitePullRequest({
-  branch,
-  repo,
-}: {
-  branch: string;
-  repo: string;
-}): GtPullRequest {
+async function readThreadPullRequests(
+  path: string
+): Promise<ThreadPullRequests> {
   let raw: string;
   try {
-    raw = execFileSync("gt", ["--no-interactive", "info", branch], {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    throw new UserError(
+      `cannot read chain file ${path}: ${errorMessage(error)}`
+    );
+  }
+  return parseThreadPullRequests(raw, path);
+}
+
+interface RemoteRepository {
+  readonly host: string;
+  readonly repository: string;
+}
+
+function remoteRepository(url: string): RemoteRepository | null {
+  let host: string;
+  let path: string;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+    host = parsed.hostname;
+    path = parsed.pathname;
+  } else {
+    const scp = /^(?:[^@/:]+@)?([^@/:]+):(.+)$/.exec(url);
+    if (scp === null || scp[1] === undefined || scp[2] === undefined) {
+      return null;
+    }
+    host = scp[1];
+    path = scp[2];
+  }
+  const segments = path
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\.git$/i, "")
+    .split("/");
+  if (
+    host.length === 0 ||
+    segments.length !== 2 ||
+    segments.some((segment) => segment.length === 0)
+  ) {
+    return null;
+  }
+  return {
+    host: host.toLowerCase(),
+    repository: segments.join("/").toLowerCase(),
+  };
+}
+
+function originRepository(repo: string): RemoteRepository {
+  let raw: string;
+  try {
+    raw = execFileSync("git", ["remote", "get-url", "origin"], {
       cwd: repo,
       encoding: "utf8",
-      env: { ...process.env, NO_COLOR: "1" },
+      env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
     throw new UserError(
-      `gt info ${branch} failed: ${errorMessage(error)}`
+      `git remote get-url origin failed: ${errorMessage(error)}`
     );
   }
-  const rows = raw
-    .replace(/\r/g, "")
-    .split("\n")
-    .filter(
-      (line) =>
-        line.startsWith("PR #") || line.startsWith("[origin] PR #")
-    );
-  if (rows.length === 0) {
+  const url = raw.trim();
+  const origin = remoteRepository(url);
+  if (origin === null) {
     throw new UserError(
-      `gt info output branch ${branch} has no pull request; this clone's gt metadata may predate the submit, so resolve the frontier from the stacker's clone or after gt sync`
+      `origin remote ${url} does not name a host and owner/name`
     );
   }
-  if (rows.length > 1) {
-    throw new UserError(
-      `gt info output contains multiple PRs for branch ${branch}`
-    );
-  }
-  return parseGtPullRequest({ branch, detail: rows[0] ?? "" });
+  return origin;
 }
 
-function graphiteFrontier(repo: string): readonly GtFrontierEntry[] {
-  let raw: string;
-  try {
-    raw = execFileSync(
-      "gt",
-      ["--no-interactive", "log", "short", "--stack", "--reverse"],
-      {
-        cwd: repo,
-        encoding: "utf8",
-        env: { ...process.env, NO_COLOR: "1" },
-        stdio: ["ignore", "pipe", "pipe"],
-      }
-    );
-  } catch (error) {
-    throw new UserError(
-      `gt log short --stack --reverse failed: ${errorMessage(error)}`
-    );
+function pullRequestKey(row: RemoteRepository): string {
+  return `${row.host.toLowerCase()}/${row.repository.toLowerCase()}`;
+}
+
+function threadPrState({
+  pr,
+  state,
+}: {
+  pr: number;
+  state: string | null;
+}): FrontierPrState {
+  switch (state) {
+    case "open":
+      return "OPEN";
+    case "merged":
+      return "MERGED";
+    case "closed":
+      return "CLOSED";
+    default:
+      throw new UserError(
+        `PR #${pr} has unknown state ${JSON.stringify(state)}; refresh the list_thread_pull_requests dump`
+      );
   }
-  const result = parseGtBranches(raw).map((branch) => ({
-    branches: branch,
-    ...graphitePullRequest({ branch, repo }),
-  }));
-  if (new Set(result.map((row) => row.pr)).size !== result.length) {
-    throw new UserError("gt info output contains duplicate pull requests");
+}
+
+function sameOrder(
+  left: readonly number[],
+  right: readonly number[]
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((pr, index) => pr === right[index])
+  );
+}
+
+interface CandidateChain {
+  readonly numbers: readonly number[];
+  readonly rows: readonly ThreadPullRequest[];
+  readonly ambiguity: string | null;
+}
+
+function candidateChain({
+  chain,
+  byNumber,
+  origin,
+}: {
+  chain: readonly number[];
+  byNumber: ReadonlyMap<number, readonly ThreadPullRequest[]>;
+  origin: string;
+}): CandidateChain | null {
+  const rows: ThreadPullRequest[] = [];
+  const collisions: string[] = [];
+  for (const pr of chain) {
+    const matches = byNumber.get(pr) ?? [];
+    const own = matches.find((row) => pullRequestKey(row) === origin);
+    if (own === undefined) {
+      return null;
+    }
+    rows.push(own);
+    if (matches.length > 1) {
+      collisions.push(
+        `PR #${pr} matches ${matches.map(pullRequestKey).join(", ")}`
+      );
+    }
   }
-  return result;
+  return {
+    numbers: chain,
+    rows,
+    ambiguity: collisions.length === 0 ? null : collisions.join("; "),
+  };
+}
+
+function selectChain({
+  candidates,
+  origin,
+  pin,
+}: {
+  candidates: readonly CandidateChain[];
+  origin: string;
+  pin: readonly number[] | undefined;
+}): CandidateChain {
+  const pinned =
+    pin === undefined
+      ? undefined
+      : candidates.find((chain) => sameOrder(chain.numbers, pin));
+  const stacks = candidates.filter((chain) => chain.numbers.length > 1);
+  const only = stacks[0];
+  const chosen =
+    pinned ?? (stacks.length === 1 && only !== undefined ? only : undefined);
+  if (chosen !== undefined) {
+    if (chosen.ambiguity !== null) {
+      throw new UserError(
+        `chain ${chosen.numbers.join(",")} is ambiguous for ${origin}: ${chosen.ambiguity}; chains carry only numbers, so dump a thread whose links hold one repository with these numbers`
+      );
+    }
+    return chosen;
+  }
+  const listed =
+    candidates.length === 0
+      ? "none"
+      : candidates
+          .map(
+            (chain) =>
+              `${chain.numbers.join(",")}${
+                chain.ambiguity === null ? "" : " (ambiguous)"
+              }`
+          )
+          .join(" | ");
+  throw new UserError(
+    `cannot choose a chain for ${origin}: ${
+      stacks.length === 0
+        ? "no chain has more than one PR"
+        : `${stacks.length} chains have more than one PR`
+    }; pin one with --prs; candidate chains: ${listed}`
+  );
 }
 
 function branchSha({
@@ -1158,13 +1269,6 @@ function branchSha({
   return sha;
 }
 
-function resolveFrontier(repo: string): readonly FrontierPr[] {
-  return graphiteFrontier(repo).map((row) => ({
-    ...row,
-    sha: branchSha({ branch: row.branches, repo }),
-  }));
-}
-
 function validateFrontierPin({
   actual,
   expected,
@@ -1184,17 +1288,70 @@ function validateFrontierPin({
   const extra = actual.filter((pr) => !expectedSet.has(pr));
   const drift: string[] = [];
   if (missing.length > 0) {
-    drift.push(`missing from gt: ${missing.join(",")}`);
+    drift.push(`missing from chain: ${missing.join(",")}`);
   }
   if (extra.length > 0) {
-    drift.push(`extra in gt: ${extra.join(",")}`);
+    drift.push(`extra in chain: ${extra.join(",")}`);
   }
   if (missing.length === 0 && extra.length === 0) {
     drift.push(
-      `order differs: expected ${expected.join(",")}; gt ${actual.join(",")}`
+      `order differs: expected ${expected.join(",")}; chain ${actual.join(",")}`
     );
   }
   throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);
+}
+
+function resolveFrontier({
+  dump,
+  pin,
+  repo,
+}: {
+  dump: ThreadPullRequests;
+  pin: readonly number[] | undefined;
+  repo: string;
+}): readonly FrontierPr[] {
+  const origin = pullRequestKey(originRepository(repo));
+  const seen = new Set<string>();
+  const byNumber = new Map<number, ThreadPullRequest[]>();
+  for (const row of dump.pullRequests) {
+    const key = `${pullRequestKey(row)}#${row.number}`;
+    if (seen.has(key)) {
+      throw new UserError(`chain file lists ${key} twice`);
+    }
+    seen.add(key);
+    const matches = byNumber.get(row.number) ?? [];
+    matches.push(row);
+    byNumber.set(row.number, matches);
+  }
+  const candidates = dump.chains.flatMap((chain) => {
+    const candidate = candidateChain({ chain, byNumber, origin });
+    return candidate === null ? [] : [candidate];
+  });
+  const chosen = selectChain({ candidates, origin, pin });
+  const chain = chosen.numbers;
+  if (new Set(chain).size !== chain.length) {
+    throw new UserError(`chain ${chain.join(",")} contains duplicate PRs`);
+  }
+  if (pin !== undefined) {
+    validateFrontierPin({ actual: chain, expected: pin });
+  }
+  const rows = chosen.rows.map((row) => {
+    const pr = row.number;
+    if (row.headBranch === null) {
+      throw new UserError(
+        `PR #${pr} has no head branch; refresh the list_thread_pull_requests dump`
+      );
+    }
+    return {
+      pr,
+      branches: row.headBranch,
+      state: threadPrState({ pr, state: row.state }),
+    };
+  });
+  return rows.map((row) => ({
+    ...row,
+    sha: branchSha({ branch: row.branches, repo }),
+  }));
 }
 
 export function openStore(
@@ -1483,6 +1640,7 @@ export function openStore(
     frontier: {
       set: async (params) => {
         await beginWrite();
+        const chain = resolve(requiredLine(params.chain, "chain file"));
         const repo = resolve(requiredLine(params.repo, "repo directory"));
         const pin =
           params.prs === undefined
@@ -1492,13 +1650,11 @@ export function openStore(
           throw new UserError("--prs must not contain duplicates");
         }
         const old = await readFrontier(store);
-        const prs = resolveFrontier(repo);
-        if (pin !== undefined) {
-          validateFrontierPin({
-            actual: prs.map((row) => row.pr),
-            expected: pin,
-          });
-        }
+        const prs = resolveFrontier({
+          dump: await readThreadPullRequests(chain),
+          pin,
+          repo,
+        });
         const value: Frontier = {
           generation: old.generation + 1,
           prs,

@@ -1,4 +1,3 @@
-import { setTimeout as delay } from "node:timers/promises";
 import {
   Command,
   CommanderError,
@@ -29,25 +28,7 @@ export interface CliOptions {
   readonly stackPrs: readonly T.PrNumber[];
   readonly statusOnly: boolean;
   readonly pretty: boolean;
-  readonly polling: T.PollingOptions;
-}
-function positiveNumber(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0)
-    throw new InvalidArgumentError("must be greater than zero");
-  return parsed;
-}
-function nonNegativeNumber(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0)
-    throw new InvalidArgumentError("must be zero or greater");
-  return parsed;
-}
-function positiveInteger(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0)
-    throw new InvalidArgumentError("must be a positive integer");
-  return parsed;
+  readonly allowDraft: boolean;
 }
 function prNumber(value: string): T.PrNumber {
   try {
@@ -71,10 +52,6 @@ interface RawOptions {
   readonly stack: boolean;
   readonly queuedStack: boolean;
   readonly stackPrs?: T.NonEmpty<T.PrNumber>;
-  readonly interval: number;
-  readonly sweepInterval: number;
-  readonly timeout: number;
-  readonly maxQueryErrors: number;
   readonly statusOnly: boolean;
   readonly allowDraft: boolean;
   readonly pretty: boolean;
@@ -85,7 +62,7 @@ export function parseArgs(
 ): CliOptions {
   const program = new Command("watch-pr")
     .description(
-      "Watch one pull request, a connected stack, or an immutable queued stack.\nJSON (NDJSON while polling) is the default; --pretty renders human text."
+      "Read GitHub once and print the merge verdict for one pull request, a connected stack, or an immutable queued stack.\nJSON lines are the default, the verdict last; --pretty renders human text."
     )
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
     .exitOverride()
@@ -93,38 +70,19 @@ export function parseArgs(
     .option("--repo <repo>", "GitHub repository name")
     .option("--pr <number>", "pull request number", prNumber)
     .addOption(
-      new Option("--stack", "watch the connected open stack")
+      new Option("--stack", "evaluate the connected open stack")
         .default(false)
         .conflicts("queuedStack")
     )
     .option(
       "--queued-stack",
-      "watch the captured stack until all PRs merge",
+      "evaluate the captured stack as a merge queue",
       false
     )
     .option(
       "--stack-prs <n,...>",
       "frozen bottom-to-top queue (queued mode only)",
       stackPrList
-    )
-    .option("--interval <seconds>", "poll interval", positiveNumber, 60)
-    .option(
-      "--sweep-interval <seconds>",
-      "whole-stack sweep interval",
-      positiveNumber,
-      300
-    )
-    .option(
-      "--timeout <seconds>",
-      "deadline; 0 disables it",
-      nonNegativeNumber,
-      0
-    )
-    .option(
-      "--max-query-errors <count>",
-      "consecutive query-error budget",
-      positiveInteger,
-      5
     )
     .option("--status-only", "print one status table and exit 0", false)
     .option("--allow-draft", "do not treat a draft as a merge gate", false)
@@ -141,13 +99,7 @@ export function parseArgs(
     stackPrs: raw.stackPrs ?? [],
     statusOnly: raw.statusOnly,
     pretty: raw.pretty,
-    polling: {
-      interval: raw.interval,
-      sweepInterval: raw.sweepInterval,
-      timeout: raw.timeout,
-      maxQueryErrors: raw.maxQueryErrors,
-      allowDraft: raw.allowDraft,
-    },
+    allowDraft: raw.allowDraft,
   };
 }
 export interface CliRuntime {
@@ -159,13 +111,7 @@ export interface CliRuntime {
 function realRuntime(): CliRuntime {
   return {
     reader: new GhGitHubReader(),
-    clock: {
-      now: () => performance.now() / 1_000,
-      observedAt: () => new Date().toISOString(),
-      sleep: async (seconds) => {
-        await delay(seconds * 1_000);
-      },
-    },
+    clock: { observedAt: () => new Date().toISOString() },
     stdout: (value) => process.stdout.write(value),
     stderr: (value) => process.stderr.write(value),
   };
@@ -201,7 +147,6 @@ export async function main(
     if (!(error instanceof WatcherQueryError)) throw error;
     const verdict = statusQueryVerdict(
       verdictFactory(runtime.clock, options.mode),
-      1,
       error.failure
     );
     runtime.stdout(render(verdict));
@@ -210,13 +155,17 @@ export async function main(
   const dependencies = { reader: runtime.reader, clock: runtime.clock, emit };
   const verdict =
     options.mode === "queued-stack" && !options.statusOnly
-      ? await runQueued({ dependencies, contexts, options: options.polling })
+      ? await runQueued({
+          dependencies,
+          contexts,
+          allowDraft: options.allowDraft,
+        })
       : await runSimple({
           dependencies,
           contexts,
           mode: options.mode,
           statusOnly: options.statusOnly,
-          options: options.polling,
+          allowDraft: options.allowDraft,
         });
   runtime.stdout(render(verdict));
   return verdict.exitCode;

@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Interrogate
 
+A skill named in bold or in backticks, or run as `/<name>`, is the file `../<name>/SKILL.md` beside this skill's directory, and a principle named without its prefix is `../principle-<name>/SKILL.md`. Read the file and follow it. Most pstack skills are user-only, so your skill tool cannot load them. Every `delegate_task` call follows the defaults in the Subagents section of `../poteto-mode/SKILL.md`.
+
 Spawn one reviewer per configured model to adversarially review code changes. Each model gets the same prompt and rubric. The adversarial signal comes from model diversity, not assigned personas.
 
 The deliverable is a synthesized verdict. Do NOT auto-apply changes.
@@ -33,19 +35,14 @@ Write one clear paragraph. If you're unsure about the intent, ask the user befor
 
 ## Step 3, Spawn Reviewers
 
-Launch all reviewers in a single message using the Task tool. Use the `interrogate reviewers` line in `~/.cursor/rules/pstack-models.mdc`, one reviewer per entry, extending or shrinking the Reviewer A/B labels below to the configured entry count. If the rule or that line is missing, use the table defaults.
-
-| Subagent | Default model |
-|----------|---------------|
-| Reviewer A | `claude-opus-5-5-xhigh` |
-| Reviewer B | `grok-4.7-xhigh-fast` |
+Launch all reviewers in a single turn, one `delegate_task` child per reviewer with `mode: "async"`. Use the `interrogate reviewers` line in `~/.config/pstack/pstack-models.md`, one reviewer per entry, labeled Reviewer A, B, C and so on to the configured entry count. If the file or that line is missing, run Reviewer A on the parent thread's model and one more reviewer on the strongest model of each other provider that `orchestrator_capabilities` reports with `canRunChildTask`, up to three reviewers. Say so and suggest `/setup-pstack`.
 
 For each reviewer:
-- `subagent_type`: `generalPurpose`
-- `model`: the configured `interrogate reviewers` entry, or the table default with no configured line. For an `auto` or `inherit-parent` entry, omit `model` so that reviewer runs on the parent model.
-- `readonly`: `true`
+- `title`: `interrogate reviewer <label>`
+- `target`: the configured `interrogate reviewers` entry. An entry `<providerInstanceId>/<model> (<effort>)` becomes `target: {"providerInstanceId": ..., "model": ..., "options": {"<effort option id>": "<effort>"}}`, with the effort option id `orchestrator_capabilities` lists for that model. For an `auto` or `inherit-parent` entry, omit `target` so that reviewer runs on the parent model.
+- The brief says read-only: inspect only, no writes, no git commands.
 
-If the Task tool rejects a configured entry, run that reviewer on the table default of its family and say so. Families go by prefix: `claude-*` and `grok-*`. With no family match, use Reviewer A's default. If it rejects a table default, check the valid slugs in the Task tool's error message, pick the closest equivalent (prefer the same family and reasoning tier), spawn with it, and open a separate PR to update the default table. Do not block the review on the slug issue. Never treat an alias entry as a rejected slug or apply either fallback to it.
+If `delegate_task` rejects a configured entry, run that reviewer on the closest model of the same provider that `orchestrator_capabilities` lists and say so. Do not block the review on it. Never treat an alias entry as a rejected entry or apply the fallback to it.
 
 Read `references/reviewer-prompt.md` and fill in the template with:
 1. The stated intent
@@ -53,7 +50,7 @@ Read `references/reviewer-prompt.md` and fill in the template with:
 3. The review rubric from `references/rubric.md`
 4. The code-quality lens from `references/code-quality-review.md`
 
-The same filled template goes to all reviewers, so every model applies the code-quality lens.
+The same filled template goes to all reviewers, so every model applies the code-quality lens. End the turn after spawning and let the completion notifications wake you.
 
 ## Step 4, Synthesize
 

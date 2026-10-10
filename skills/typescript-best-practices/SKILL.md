@@ -2,10 +2,11 @@
 name: typescript-best-practices
 description: TypeScript best practices. Use when reading or editing any .ts or .tsx file.
 paths: ["**/*.ts", "**/*.tsx"]
-disable-model-invocation: true
 ---
 
 # TypeScript best practices
+
+A skill named in bold or in backticks, or run as `/<name>`, is the file `../<name>/SKILL.md` beside this skill's directory, and a principle named without its prefix is `../principle-<name>/SKILL.md`. Read the file and follow it. Most pstack skills are user-only, so your skill tool cannot load them.
 
 Apply the **type-system-discipline** principle skill first.
 

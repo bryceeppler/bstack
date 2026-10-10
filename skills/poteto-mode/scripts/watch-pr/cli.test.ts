@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { type CliRuntime, main, parseArgs } from "./cli.ts";
-import { fakeReader, passingCheck } from "./fakes.test-helper.ts";
+import {
+  fakeReader,
+  passingCheck,
+  pendingCheck,
+} from "./fakes.test-helper.ts";
 import { renderJson, renderPretty } from "./render.ts";
 import type { GitHubReader, WatcherVerdict } from "./types.ts";
 import { parsePrNumber } from "./types.ts";
@@ -19,13 +23,7 @@ function testRuntime(reader: GitHubReader): {
     stderr,
     runtime: {
       reader,
-      clock: {
-        now: () => 0,
-        observedAt: () => "2026-07-26T00:00:00.000Z",
-        async sleep() {
-          throw new Error("test unexpectedly slept");
-        },
-      },
+      clock: { observedAt: () => "2026-07-26T00:00:00.000Z" },
       stdout: (value) => stdout.push(value),
       stderr: (value) => stderr.push(value),
     },
@@ -42,13 +40,7 @@ describe("parseArgs", () => {
       stackPrs: [],
       statusOnly: false,
       pretty: false,
-      polling: {
-        interval: 60,
-        sweepInterval: 300,
-        timeout: 0,
-        maxQueryErrors: 5,
-        allowDraft: false,
-      },
+      allowDraft: false,
     });
   });
 
@@ -58,14 +50,6 @@ describe("parseArgs", () => {
         "--queued-stack",
         "--stack-prs",
         "#10, 11,#12",
-        "--interval",
-        "2.5",
-        "--sweep-interval",
-        "30",
-        "--timeout",
-        "0",
-        "--max-query-errors",
-        "3",
         "--allow-draft",
         "--pretty",
       ],
@@ -73,23 +57,18 @@ describe("parseArgs", () => {
     );
     expect(parsed.mode).toBe("queued-stack");
     expect(parsed.stackPrs.map(Number)).toEqual([10, 11, 12]);
-    expect(parsed.polling).toEqual({
-      interval: 2.5,
-      sweepInterval: 30,
-      timeout: 0,
-      maxQueryErrors: 3,
-      allowDraft: true,
-    });
+    expect(parsed.allowDraft).toBe(true);
     expect(parsed.pretty).toBe(true);
   });
 
-  it("rejects every invalid mode and numeric shape as usage", async () => {
+  it("rejects invalid modes, PR shapes and the removed wait options", async () => {
     const invalid = [
       ["--unknown"],
-      ["--interval", "0"],
-      ["--sweep-interval", "-1"],
-      ["--timeout", "-1"],
-      ["--max-query-errors", "1.5"],
+      ["--pr", "0"],
+      ["--interval", "60"],
+      ["--sweep-interval", "300"],
+      ["--timeout", "600"],
+      ["--max-query-errors", "5"],
       ["--stack", "--queued-stack"],
       ["--stack-prs", "1,2"],
       ["--queued-stack", "--stack-prs", "1,1"],
@@ -156,10 +135,10 @@ describe("rendering", () => {
 describe("main", () => {
   it("returns EX_USAGE 64 and writes usage errors only to stderr", async () => {
     const harness = testRuntime(fakeReader());
-    expect(await main(["--interval", "0"], harness.runtime)).toBe(64);
+    expect(await main(["--pr", "0"], harness.runtime)).toBe(64);
     expect(harness.stdout).toEqual([]);
     expect(harness.stderr.join("")).toContain(
-      "option '--interval <seconds>' argument '0' is invalid"
+      "option '--pr <number>' argument '0' is invalid"
     );
   });
 
@@ -191,6 +170,29 @@ describe("main", () => {
     expect(harness.stdout[0]).not.toContain('"kind":"QUEUE"');
   });
 
+  it("reads GitHub once and exits 5 with WAITING on pending checks", async () => {
+    const reader = fakeReader({
+      fastPath: { kind: "checks", checks: [pendingCheck("build")] },
+    });
+    const harness = testRuntime(reader);
+    const code = await main(
+      ["--owner", "owner", "--repo", "repo", "--pr", "1"],
+      harness.runtime
+    );
+    expect(code).toBe(5);
+    expect(harness.stdout).toHaveLength(1);
+    expect(JSON.parse(harness.stdout[0])).toMatchObject({
+      kind: "WAITING",
+      terminal: false,
+      exitCode: 5,
+      frontier: { number: 1 },
+      reason: { kind: "pending-checks", pending: [{ name: "build" }] },
+    });
+    expect(reader.calls.filter((call) => call === "pullRequest")).toEqual([
+      "pullRequest",
+    ]);
+  });
+
   it("returns exit 4 for a hidden GitHub-side CI refusal", async () => {
     const reader = fakeReader({
       facts: { mergeStateStatus: "BLOCKED" },
@@ -218,7 +220,7 @@ describe("main", () => {
     const reader = fakeReader();
     const harness = testRuntime(reader);
     expect(await main(["--help"], harness.runtime)).toBe(0);
-    expect(harness.stdout.join("")).toContain("JSON (NDJSON while polling)");
+    expect(harness.stdout.join("")).toContain("Read GitHub once");
     expect(reader.calls).toEqual([]);
   });
 });

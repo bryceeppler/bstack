@@ -66,7 +66,6 @@ function threadLine(thread: T.ReviewThread): string {
 }
 type StatusQueryBlocker = {
   readonly kind: "status-query";
-  readonly failures: number;
   readonly failure: { readonly detail: string };
 };
 function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
@@ -120,9 +119,8 @@ function renderBlocker(blocker: T.MergeBlocker | StatusQueryBlocker): string {
     case "status-query":
       return [
         "BLOCKER: status-query",
-        `failures=${blocker.failures}`,
         `detail=${blocker.failure.detail}`,
-        "action=verify current PR context, GitHub authentication, and API availability, then rearm",
+        "action=verify current PR context, GitHub authentication, and API availability, then rerun",
       ].join("\n");
     default: {
       const exhaustive: never = blocker;
@@ -142,8 +140,6 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
         : `WAITING: frontier=#${verdict.frontier.number} is blocker-free; waiting for merge queue (${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged)\n`;
     case "ADVANCE":
       return `ADVANCE: merged #${verdict.merged.number}; next=#${verdict.frontier.number}; remaining=${verdict.remaining}\n`;
-    case "RETRY":
-      return `RETRY: GitHub status query failed; retrying in ${verdict.retryInSeconds}s\ndetail=${verdict.failure.detail}\n`;
     case "BLOCKER":
       return `${renderBlocker(verdict.blocker)}\n`;
     case "READY": {
@@ -155,12 +151,6 @@ export function renderPretty(verdict: T.WatcherVerdict): string {
     }
     case "COMPLETE":
       return `COMPLETE: queued stack merged (${verdict.queue.length} PR${verdict.queue.length === 1 ? "" : "s"})\n`;
-    case "TIMEOUT":
-      if (verdict.reason.kind === "pending-checks")
-        return "TIMEOUT: checks still pending\n";
-      if (verdict.reason.kind === "status-unavailable")
-        return "TIMEOUT: GitHub status remained unavailable\n";
-      return `TIMEOUT: queued stack still has ${verdict.reason.unmergedCount} PR${verdict.reason.unmergedCount === 1 ? "" : "s"} unmerged; frontier=#${verdict.reason.frontier.number}\n`;
     default: {
       const exhaustive: never = verdict;
       return exhaustive;

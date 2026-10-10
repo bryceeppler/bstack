@@ -1,13 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { WatcherQueryError } from "./github.ts";
 import {
-  applyQueueSnapshot,
   assessGitHubMerge,
   classifyPr,
-  createQueueState,
-  evaluateQueue,
-  planQueue,
-  queryBackoffSeconds,
   readSnapshot,
   runQueued,
   selectTierMajorStackDecision,
@@ -20,8 +15,6 @@ import {
 } from "./fakes.test-helper.ts";
 import type {
   GitHubReader,
-  NonEmpty,
-  PollingOptions,
   PrContext,
   ProgressVerdict,
   PullRequestFacts,
@@ -34,13 +27,6 @@ const context = (number: number): PrContext => ({
   repo: "repo",
   number: parsePrNumber(number),
 });
-const options = {
-  interval: 10,
-  sweepInterval: 300,
-  timeout: 0,
-  maxQueryErrors: 5,
-  allowDraft: false,
-} satisfies PollingOptions;
 
 describe("readiness truth table", () => {
   it("covers every specified row and every UNKNOWN rollup value", () => {
@@ -221,133 +207,32 @@ it("waits on a draft while checks are pending, then reports the draft gate", asy
   });
 });
 
-describe("queued-stack cadence", () => {
-  async function openSnapshot(pr: PrContext) {
-    return readSnapshot({
-      reader: fakeReader(),
-      context: pr,
-      pendingHistory: "omit",
-      allowDraft: false,
-    });
-  }
-
-  it("drops a sweep head only after its snapshot succeeds", async () => {
-    const queue = [
-      context(20),
-      context(21),
-      context(22),
-    ] satisfies NonEmpty<PrContext>;
-    let state = createQueueState(queue, 0);
-    const first = await openSnapshot(queue[0]);
-    state = applyQueueSnapshot(state, first, 0, options).state;
-    expect(state.work).toMatchObject({
-      kind: "whole-stack-sweep",
-      remaining: [{ number: 21 }, { number: 22 }],
-    });
-    const second = await openSnapshot(queue[1]);
-    state = applyQueueSnapshot(state, second, 60, options).state;
-    expect(state.work).toMatchObject({
-      kind: "whole-stack-sweep",
-      remaining: [{ number: 22 }],
-    });
-  });
-
-  it("resumes the sweep at the PR whose read failed", async () => {
-    const middle = context(21);
-    const base = fakeReader();
-    let failNext = true;
-    const timeline: string[] = [];
-    const reader = {
-      ...base,
-      async pullRequest(pr: PrContext) {
-        if (pr.number === middle.number && failNext) {
-          failNext = false;
-          timeline.push(`fail:${pr.number}`);
-          throw new WatcherQueryError({
-            kind: "command-exit",
-            retryable: true,
-            detail: "rate limited",
-            code: 1,
-          });
-        }
-        timeline.push(`read:${pr.number}`);
-        return base.pullRequest(pr);
-      },
-    } satisfies GitHubReader;
-    let now = 0;
-    let sleeps = 0;
+describe("queued-stack one-shot", () => {
+  function queuedRun(reader: GitHubReader, contexts: readonly PrContext[]) {
+    const emitted: ProgressVerdict[] = [];
+    const [first, ...rest] = contexts;
+    if (first === undefined) throw new Error("queue cannot be empty");
     const running = runQueued({
       dependencies: {
         reader,
-        clock: {
-          now: () => now,
-          observedAt: () => "2026-07-26T00:00:00.000Z",
-          async sleep(seconds) {
-            timeline.push("sleep");
-            now += seconds;
-            sleeps += 1;
-            if (sleeps === 2) throw new Error("stop after resume proof");
-          },
-        },
-        emit(verdict) {
-          timeline.push(`emit:${verdict.kind}`);
-        },
+        clock: { observedAt: () => "2026-07-26T00:00:00.000Z" },
+        emit: (verdict) => emitted.push(verdict),
       },
-      contexts: [context(20), middle, context(22)],
-      options,
+      contexts: [first, ...rest],
+      allowDraft: false,
     });
-    await expect(running).rejects.toThrow("stop after resume proof");
-    expect(timeline).toEqual([
-      "emit:QUEUE",
-      "read:20",
-      "fail:21",
-      "emit:RETRY",
-      "sleep",
-      "read:21",
-      "read:22",
-      "emit:STATUS",
-      "emit:WAITING",
-      "sleep",
-    ]);
-  });
+    return { running, emitted };
+  }
 
-  it("emits a completed sweep only after its final successful snapshot", async () => {
-    const queue = [context(30), context(31)] satisfies NonEmpty<PrContext>;
-    let state = createQueueState(queue, 0);
-    const first = applyQueueSnapshot(
-      state,
-      await openSnapshot(queue[0]),
-      0,
-      options
-    );
-    expect(first.completedSweepRows).toBeNull();
-    state = first.state;
-    const second = applyQueueSnapshot(
-      state,
-      await openSnapshot(queue[1]),
-      5,
-      options
-    );
-    expect(
-      second.completedSweepRows?.map((row) => Number(row.context.number))
-    ).toEqual([30, 31]);
-    expect(second.state.nextSweepAt).toBe(305);
-  });
-
-  it("ADVANCE continues directly to the new frontier without sleeping", async () => {
-    const one = context(40);
-    const two = context(41);
+  function readerMerging(merged: readonly number[]) {
     const base = fakeReader();
-    const reads = new Map<number, number>();
-    const timeline: string[] = [];
+    const reads: number[] = [];
     const reader = {
       ...base,
       async pullRequest(pr: PrContext) {
-        timeline.push(`read:${pr.number}`);
+        reads.push(pr.number);
         const facts = await base.pullRequest(pr);
-        const count = (reads.get(pr.number) ?? 0) + 1;
-        reads.set(pr.number, count);
-        return pr.number === one.number && count > 1
+        return merged.includes(pr.number)
           ? {
               ...facts,
               state: "MERGED" as const,
@@ -356,65 +241,78 @@ describe("queued-stack cadence", () => {
           : facts;
       },
     } satisfies GitHubReader;
-    let now = 0;
-    let sleeps = 0;
-    const emitted: ProgressVerdict[] = [];
-    const running = runQueued({
-      dependencies: {
-        reader,
-        clock: {
-          now: () => now,
-          observedAt: () => "2026-07-26T00:00:00.000Z",
-          async sleep(seconds) {
-            timeline.push("sleep");
-            now += seconds;
-            sleeps += 1;
-            if (sleeps === 2) throw new Error("stop after advance proof");
-          },
-        },
-        emit(verdict) {
-          emitted.push(verdict);
-          timeline.push(`emit:${verdict.kind}`);
-        },
-      },
-      contexts: [one, two],
-      options,
+    return { reader, reads };
+  }
+
+  it("reads each PR once and stops a blocker-free frontier at merge-queue WAITING", async () => {
+    const { reader, reads } = readerMerging([]);
+    const { running, emitted } = queuedRun(reader, [context(30), context(31)]);
+    expect(await running).toMatchObject({
+      kind: "WAITING",
+      terminal: false,
+      exitCode: 5,
+      frontier: { number: 30 },
+      reason: { kind: "merge-queue", unmergedCount: 2 },
     });
-    await expect(running).rejects.toThrow("stop after advance proof");
-    expect(emitted.some((event) => event.kind === "ADVANCE")).toBe(true);
-    const firstSleep = timeline.indexOf("sleep");
-    expect(timeline.slice(firstSleep, firstSleep + 5)).toEqual([
-      "sleep",
-      "read:40",
-      "emit:ADVANCE",
-      "read:41",
-      "emit:WAITING",
+    expect(reads).toEqual([30, 31]);
+    expect(emitted.map((event) => event.kind)).toEqual(["QUEUE", "STATUS"]);
+  });
+
+  it("reports ADVANCE when the frozen list's bottom has merged", async () => {
+    const { reader } = readerMerging([40, 41]);
+    const { running, emitted } = queuedRun(reader, [
+      context(40),
+      context(41),
+      context(42),
     ]);
+    expect(await running).toMatchObject({
+      kind: "WAITING",
+      frontier: { number: 42 },
+      reason: { kind: "merge-queue", unmergedCount: 1 },
+    });
+    expect(emitted.at(-1)).toMatchObject({
+      kind: "ADVANCE",
+      merged: { number: 41 },
+      frontier: { number: 42 },
+      remaining: 1,
+    });
   });
 
-  it("deduplicates identical waits and schedules the next due sweep", async () => {
-    const queue = [context(50)] satisfies NonEmpty<PrContext>;
-    let state = createQueueState(queue, 0);
-    state = applyQueueSnapshot(
-      state,
-      await openSnapshot(queue[0]),
-      0,
-      options
-    ).state;
-    const first = evaluateQueue(state, 0, options);
-    expect(first.kind).toBe("waiting");
-    if (first.kind !== "waiting") throw new Error("expected waiting");
-    expect(first.emit).toBe(true);
-    const second = evaluateQueue(first.state, 10, options);
-    expect(second.kind).toBe("waiting");
-    if (second.kind !== "waiting") throw new Error("expected waiting");
-    expect(second.emit).toBe(false);
-    expect(planQueue(second.state, 300).work?.kind).toBe("whole-stack-sweep");
+  it("returns COMPLETE once every queued PR has merged", async () => {
+    const { reader } = readerMerging([50, 51]);
+    const { running, emitted } = queuedRun(reader, [context(50), context(51)]);
+    expect(await running).toMatchObject({
+      kind: "COMPLETE",
+      terminal: true,
+      exitCode: 0,
+      merged: [{ context: { number: 50 } }, { context: { number: 51 } }],
+    });
+    expect(emitted.some((event) => event.kind === "ADVANCE")).toBe(false);
   });
-});
 
-it("uses the specified retry floor and cap", () => {
-  expect(queryBackoffSeconds(1, 1)).toBe(60);
-  expect(queryBackoffSeconds(1, 2)).toBe(120);
-  expect(queryBackoffSeconds(60, 4)).toBe(300);
+  it("turns a query failure into a status-query BLOCKER without retrying", async () => {
+    const base = fakeReader();
+    const reads: number[] = [];
+    const reader = {
+      ...base,
+      async pullRequest(pr: PrContext) {
+        reads.push(pr.number);
+        if (pr.number === 61)
+          throw new WatcherQueryError({
+            kind: "command-exit",
+            retryable: true,
+            detail: "rate limited",
+            code: 1,
+          });
+        return base.pullRequest(pr);
+      },
+    } satisfies GitHubReader;
+    const { running } = queuedRun(reader, [context(60), context(61)]);
+    expect(await running).toMatchObject({
+      kind: "BLOCKER",
+      exitCode: 7,
+      blocker: { kind: "status-query", failure: { detail: "rate limited" } },
+    });
+    expect(reads).toEqual([60, 61]);
+  });
 });

@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import {
-  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -8,7 +7,6 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -76,15 +74,21 @@ async function makeGitStack(directory: string): Promise<{
   readonly mergedSha: string;
   readonly closedSha: string;
   readonly openSha: string;
+  readonly singleSha: string;
 }> {
   const repo = join(directory, "repo");
   await mkdir(repo);
   git({ repo, args: ["init", "--initial-branch=main"] });
   git({ repo, args: ["config", "user.name", "Orch Test"] });
   git({ repo, args: ["config", "user.email", "orch@example.com"] });
+  git({
+    repo,
+    args: ["remote", "add", "origin", "git@github.com:Acme/Widgets.git"],
+  });
   await writeFile(join(repo, "main.txt"), "main\n");
   git({ repo, args: ["add", "."] });
   git({ repo, args: ["commit", "-m", "main"] });
+  git({ repo, args: ["branch", "single"] });
 
   const branches = ["stack/merged", "stack/closed", "stack/open"];
   for (const [index, branch] of branches.entries()) {
@@ -99,62 +103,111 @@ async function makeGitStack(directory: string): Promise<{
     mergedSha: git({ repo, args: ["rev-parse", "stack/merged"] }),
     closedSha: git({ repo, args: ["rev-parse", "stack/closed"] }),
     openSha: git({ repo, args: ["rev-parse", "stack/open"] }),
+    singleSha: git({ repo, args: ["rev-parse", "single"] }),
   };
 }
 
-async function withFakeGt<T>({
-  directory,
-  operation,
-  output,
-}: {
-  directory: string;
-  operation: (outputPath: string) => Promise<T>;
-  output: string;
-}): Promise<T> {
-  const bin = join(directory, "bin");
-  const outputPath = join(directory, "gt-output.txt");
-  await mkdir(bin);
-  await writeFile(outputPath, output);
-  const gt = join(bin, "gt");
-  await writeFile(
-    gt,
-    `#!/usr/bin/env bash
-set -euo pipefail
-if [ "$(pwd -P)" != "${realpathSync(join(directory, "repo"))}" ]; then
-  printf 'gt ran outside the fixture repo: %s\\n' "$(pwd -P)" >&2
-  exit 2
-fi
-case "$*" in
-  "--no-interactive log short --stack --reverse")
-    cat "${outputPath}"
-    ;;
-  "--no-interactive info stack/merged")
-    printf 'stack/merged\\nPR #10 (Merged) merged change\\n'
-    ;;
-  "--no-interactive info stack/closed")
-    printf 'stack/closed\\nPR #13 (Closed) closed change\\n'
-    ;;
-  "--no-interactive info stack/open")
-    printf 'stack/open\\nPR #11 (Needs approvals) open change\\n'
-    ;;
-  *)
-    printf 'unexpected gt arguments: %s\\n' "$*" >&2
-    exit 2
-    ;;
-esac
-`
-  );
-  await chmod(gt, 0o755);
+interface DumpPullRequest {
+  readonly host?: string;
+  readonly repository: string;
+  readonly number: number;
+  readonly state: string | null;
+  readonly headBranch: string | null;
+}
 
-  const originalPath = process.env.PATH;
-  process.env.PATH = `${bin}:${originalPath ?? ""}`;
+function openPr(number: number, headBranch: string): DumpPullRequest {
+  return { repository: "acme/widgets", number, state: "open", headBranch };
+}
+
+const STACK_PRS: readonly DumpPullRequest[] = [
+  {
+    repository: "acme/widgets",
+    number: 10,
+    state: "merged",
+    headBranch: "stack/merged",
+  },
+  {
+    repository: "acme/widgets",
+    number: 13,
+    state: "closed",
+    headBranch: "stack/closed",
+  },
+  openPr(11, "stack/open"),
+  openPr(12, "single"),
+  {
+    repository: "other/repo",
+    number: 40,
+    state: "open",
+    headBranch: "elsewhere/base",
+  },
+  {
+    repository: "other/repo",
+    number: 41,
+    state: "open",
+    headBranch: "elsewhere/top",
+  },
+  {
+    repository: "other/repo",
+    number: 96,
+    state: null,
+    headBranch: null,
+  },
+];
+
+const STACK_CHAINS: readonly (readonly number[])[] = [
+  [10, 13, 11],
+  [12],
+  [40, 41],
+  [96],
+];
+
+async function writeDump({
+  chains,
+  directory,
+  pullRequests,
+}: {
+  chains: readonly (readonly number[])[];
+  directory: string;
+  pullRequests: readonly DumpPullRequest[];
+}): Promise<string> {
+  const path = join(directory, `prs-${crypto.randomUUID()}.json`);
+  await writeFile(
+    path,
+    JSON.stringify({
+      pullRequests: pullRequests.map((row) => ({
+        host: "github.com",
+        url: `https://github.com/${row.repository}/pull/${row.number}`,
+        title: `PR ${row.number}`,
+        baseBranch: "main",
+        isDraft: false,
+        stack: null,
+        ...row,
+      })),
+      chains: chains.map((numbers) => ({ kind: "native", numbers })),
+    })
+  );
+  return path;
+}
+
+const ISOLATED_GIT = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+
+async function withEnv(
+  values: Readonly<Record<string, string>>,
+  run: () => Promise<void>
+): Promise<void> {
+  const saved = new Map(
+    Object.keys(values).map((name) => [name, process.env[name]])
+  );
+  Object.assign(process.env, values);
   try {
-    return await operation(outputPath);
+    await run();
   } finally {
-    if (originalPath === undefined) {
-      delete process.env.PATH;
-    } else {
-      process.env.PATH = originalPath;
+    for (const [name, value] of saved) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
     }
   }
 }
@@ -406,93 +459,280 @@ describe("Store", () => {
     ]);
   });
 
-  it("resolves the ordered Graphite frontier and validates an optional pin", async () => {
+  it("resolves the only stacked chain of the origin repository with head SHAs", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
-    const output = `◯ main
-◯ stack/merged
-◯ stack/closed
-◉ stack/open (current)
-`;
-
-    await withFakeGt({
+    const chain = await writeDump({
       directory,
-      output,
-      operation: async () => {
-        expect(await store.frontier.set({ repo: stack.repo })).toEqual({
-          generation: 1,
-          prs: [
-            {
-              pr: 10,
-              branches: "stack/merged",
-              sha: stack.mergedSha,
-              state: "MERGED",
-            },
-            {
-              pr: 13,
-              branches: "stack/closed",
-              sha: stack.closedSha,
-              state: "CLOSED",
-            },
-            {
-              pr: 11,
-              branches: "stack/open",
-              sha: stack.openSha,
-              state: "OPEN",
-            },
-          ],
-          lowestUnmerged: 11,
-        });
+      pullRequests: STACK_PRS,
+      chains: STACK_CHAINS,
+    });
+
+    expect(await store.frontier.set({ chain, repo: stack.repo })).toEqual({
+      generation: 1,
+      prs: [
+        {
+          pr: 10,
+          branches: "stack/merged",
+          sha: stack.mergedSha,
+          state: "MERGED",
+        },
+        {
+          pr: 13,
+          branches: "stack/closed",
+          sha: stack.closedSha,
+          state: "CLOSED",
+        },
+        {
+          pr: 11,
+          branches: "stack/open",
+          sha: stack.openSha,
+          state: "OPEN",
+        },
+      ],
+      lowestUnmerged: 11,
+    });
+    expect(
+      (await store.frontier.set({ chain, repo: stack.repo, prs: [10, 13, 11] }))
+        .generation
+    ).toBe(2);
+    expect(
+      (await store.frontier.set({ chain, repo: stack.repo, prs: [12] })).prs
+    ).toEqual([
+      { pr: 12, branches: "single", sha: stack.singleSha, state: "OPEN" },
+    ]);
+    expect((await store.frontier.show()).generation).toBe(3);
+  });
+
+  it("chooses between stacked chains only by pin and lists the candidates otherwise", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    const chain = await writeDump({
+      directory,
+      pullRequests: [
+        ...STACK_PRS,
+        openPr(14, "second/base"),
+        openPr(15, "second/top"),
+      ],
+      chains: [...STACK_CHAINS, [14, 15]],
+    });
+
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo })
+    ).rejects.toThrow(
+      "cannot choose a chain for github.com/acme/widgets: 2 chains have more than one PR; pin one with --prs; candidate chains: 10,13,11 | 12 | 14,15"
+    );
+    expect(
+      (
+        await store.frontier.set({ chain, repo: stack.repo, prs: [10, 13, 11] })
+      ).prs.map((row) => row.pr)
+    ).toEqual([10, 13, 11]);
+
+    const singles = await writeDump({
+      directory,
+      pullRequests: STACK_PRS,
+      chains: [[12], [40, 41]],
+    });
+    await expect(
+      store.frontier.set({ chain: singles, repo: stack.repo })
+    ).rejects.toThrow(
+      "cannot choose a chain for github.com/acme/widgets: no chain has more than one PR; pin one with --prs; candidate chains: 12"
+    );
+  });
+
+  it("fails closed on a chain whose numbers collide across repositories, even when pinned", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    const chain = await writeDump({
+      directory,
+      pullRequests: [
+        openPr(10, "stack/merged"),
+        openPr(11, "stack/open"),
+        { ...openPr(10, "elsewhere/base"), repository: "other/repo" },
+        { ...openPr(11, "elsewhere/top"), repository: "other/repo" },
+      ],
+      chains: [[10], [11], [10, 11]],
+    });
+    const ambiguous =
+      "chain 10,11 is ambiguous for github.com/acme/widgets: PR #10 matches github.com/acme/widgets, github.com/other/repo; PR #11 matches github.com/acme/widgets, github.com/other/repo";
+
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo })
+    ).rejects.toThrow(ambiguous);
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo, prs: [10, 11] })
+    ).rejects.toThrow(ambiguous);
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo, prs: [10] })
+    ).rejects.toThrow("chain 10 is ambiguous");
+
+    const crossHost = await writeDump({
+      directory,
+      pullRequests: [
+        ...STACK_PRS,
+        openPr(1, "stack/merged"),
+        openPr(2, "stack/open"),
+        { ...openPr(1, "mirror/base"), host: "ghe.example.com" },
+      ],
+      chains: [...STACK_CHAINS, [1, 2]],
+    });
+    await expect(
+      store.frontier.set({ chain: crossHost, repo: stack.repo })
+    ).rejects.toThrow(
+      "cannot choose a chain for github.com/acme/widgets: 2 chains have more than one PR; pin one with --prs; candidate chains: 10,13,11 | 12 | 1,2 (ambiguous)"
+    );
+    expect(
+      (
+        await store.frontier.set({
+          chain: crossHost,
+          repo: stack.repo,
+          prs: [10, 13, 11],
+        })
+      ).prs.map((row) => row.pr)
+    ).toEqual([10, 13, 11]);
+    await expect(
+      store.frontier.set({ chain: crossHost, repo: stack.repo, prs: [1, 2] })
+    ).rejects.toThrow(
+      "chain 1,2 is ambiguous for github.com/acme/widgets: PR #1 matches github.com/acme/widgets, ghe.example.com/acme/widgets"
+    );
+    expect((await store.frontier.show()).generation).toBe(1);
+  });
+
+  it("matches the origin by host as well as owner/name", async () => {
+    await withEnv(ISOLATED_GIT, async () => {
+      const { directory, store } = await initializedStore();
+      const stack = await makeGitStack(directory);
+      const otherHost = await writeDump({
+        directory,
+        pullRequests: STACK_PRS.map((row) => ({
+          ...row,
+          host: "GHE.example.com",
+        })),
+        chains: STACK_CHAINS,
+      });
+      await expect(
+        store.frontier.set({ chain: otherHost, repo: stack.repo })
+      ).rejects.toThrow(
+        "cannot choose a chain for github.com/acme/widgets: no chain has more than one PR; pin one with --prs; candidate chains: none"
+      );
+
+      const chain = await writeDump({
+        directory,
+        pullRequests: STACK_PRS.map((row) => ({
+          ...row,
+          host: "GitHub.com",
+          repository: row.repository.toUpperCase(),
+        })),
+        chains: STACK_CHAINS,
+      });
+      const remotes = [
+        "git@github.com:Acme/Widgets.git",
+        "git@github.com:acme/widgets",
+        "ssh://git@github.com/Acme/Widgets.git",
+        "ssh://git@GitHub.com:22/acme/widgets/",
+        "https://github.com/Acme/Widgets.git",
+        "https://token@github.com/acme/widgets/",
+      ];
+      for (const url of remotes) {
+        git({ repo: stack.repo, args: ["remote", "set-url", "origin", url] });
         expect(
-          (
-            await store.frontier.set({
-              repo: stack.repo,
-              prs: [10, 13, 11],
-            })
-          ).generation
-        ).toBe(2);
-        expect((await store.frontier.show()).generation).toBe(2);
+          (await store.frontier.set({ chain, repo: stack.repo })).prs.map(
+            (row) => row.pr
+          )
+        ).toEqual([10, 13, 11]);
+      }
+
+      git({
+        repo: stack.repo,
+        args: ["remote", "set-url", "origin", "git@ghe.example.com:Acme/Widgets.git"],
+      });
+      await expect(
+        store.frontier.set({ chain, repo: stack.repo })
+      ).rejects.toThrow(
+        "cannot choose a chain for ghe.example.com/acme/widgets: no chain has more than one PR"
+      );
+      for (const url of ["/srv/git/widgets.git", "https://github.com/acme"]) {
+        git({ repo: stack.repo, args: ["remote", "set-url", "origin", url] });
         await expect(
-          store.frontier.set({
-            repo: stack.repo,
-            prs: [10, 11, 12],
-          })
+          store.frontier.set({ chain, repo: stack.repo })
         ).rejects.toThrow(
-          "frontier pin mismatch: missing from gt: 12; extra in gt: 13"
+          `origin remote ${url} does not name a host and owner/name`
         );
-        await expect(
-          store.frontier.set({
-            repo: stack.repo,
-            prs: [13, 10, 11],
-          })
-        ).rejects.toThrow(
-          "frontier pin mismatch: order differs: expected 13,10,11; gt 10,13,11"
-        );
-        await expect(
-          store.frontier.set({
-            repo: stack.repo,
-            prs: [10, 10],
-          })
-        ).rejects.toThrow("--prs must not contain duplicates");
-      },
+      }
+      expect((await store.frontier.show()).generation).toBe(remotes.length);
     });
   });
 
-  it("rejects unparseable Graphite output loudly", async () => {
+  it("reports pin drift against the chosen chain without advancing the generation", async () => {
     const { directory, store } = await initializedStore();
     const stack = await makeGitStack(directory);
-
-    await withFakeGt({
+    const chain = await writeDump({
       directory,
-      output: "◯ main\nthis line is not Graphite output\n",
-      operation: async () => {
-        await expect(
-          store.frontier.set({ repo: stack.repo })
-        ).rejects.toThrow(
-          'gt log short output has an unparseable line 2: "this line is not Graphite output"'
-        );
-      },
+      pullRequests: STACK_PRS,
+      chains: STACK_CHAINS,
     });
+
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo, prs: [10, 11, 12] })
+    ).rejects.toThrow(
+      "frontier pin mismatch: missing from chain: 12; extra in chain: 13"
+    );
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo, prs: [13, 10, 11] })
+    ).rejects.toThrow(
+      "frontier pin mismatch: order differs: expected 13,10,11; chain 10,13,11"
+    );
+    await expect(
+      store.frontier.set({ chain, repo: stack.repo, prs: [10, 10] })
+    ).rejects.toThrow("--prs must not contain duplicates");
+    expect((await store.frontier.show()).generation).toBe(0);
+  });
+
+  it("fails closed on an unknown state or head branch in the chosen chain", async () => {
+    const { directory, store } = await initializedStore();
+    const stack = await makeGitStack(directory);
+    const withRow = (row: DumpPullRequest): Promise<string> =>
+      writeDump({
+        directory,
+        pullRequests: STACK_PRS.map((pr) => (pr.number === 11 ? row : pr)),
+        chains: STACK_CHAINS,
+      });
+
+    await expect(
+      store.frontier.set({
+        chain: await withRow({ ...openPr(11, "stack/open"), state: null }),
+        repo: stack.repo,
+      })
+    ).rejects.toThrow(
+      "PR #11 has unknown state null; refresh the list_thread_pull_requests dump"
+    );
+    await expect(
+      store.frontier.set({
+        chain: await withRow({ ...openPr(11, "stack/open"), state: "draft" }),
+        repo: stack.repo,
+      })
+    ).rejects.toThrow('PR #11 has unknown state "draft"');
+    await expect(
+      store.frontier.set({
+        chain: await withRow({ ...openPr(11, "stack/open"), headBranch: null }),
+        repo: stack.repo,
+      })
+    ).rejects.toThrow(
+      "PR #11 has no head branch; refresh the list_thread_pull_requests dump"
+    );
+    await expect(
+      store.frontier.set({
+        chain: await withRow(openPr(11, "stack/missing")),
+        repo: stack.repo,
+      })
+    ).rejects.toThrow("git rev-parse stack/missing failed");
+
+    const malformed = join(directory, "malformed.json");
+    await writeFile(malformed, '{"pullRequests":[]}\n');
+    await expect(
+      store.frontier.set({ chain: malformed, repo: stack.repo })
+    ).rejects.toThrow("must hold the list_thread_pull_requests result");
+    expect((await store.frontier.show()).generation).toBe(0);
   });
 
   it("rejects malformed TSV, verdict, frontier, and inbox data", async () => {
@@ -547,6 +787,7 @@ describe("orch CLI", () => {
 
     const frontierHelp = runCli(["frontier", "set", "--help"]);
     expect(frontierHelp.code).toBe(0);
+    expect(frontierHelp.stdout).toContain("--chain <file>");
     expect(frontierHelp.stdout).toContain("--repo <dir>");
     expect(frontierHelp.stdout).toContain("--prs <n,...>");
 
@@ -586,6 +827,8 @@ describe("orch CLI", () => {
       directory,
       "frontier",
       "set",
+      "--chain",
+      join(directory, "prs.json"),
     ]);
     expect(missingRepo.code).toBe(1);
     expect(missingRepo.stderr).toContain(

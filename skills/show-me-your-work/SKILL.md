@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # Show me your work
 
+A skill named in bold or in backticks, or run as `/<name>`, is the file `../<name>/SKILL.md` beside this skill's directory, and a principle named without its prefix is `../principle-<name>/SKILL.md`. Read the file and follow it. Most pstack skills are user-only, so your skill tool cannot load them. Every `delegate_task` call follows the defaults in the Subagents section of `../poteto-mode/SKILL.md`.
+
 Keep one canonical log.
 
 ## The format
@@ -39,7 +41,7 @@ Use the helper `scripts/log.sh <logfile> <phase> <decision> <why> <evidence> <re
 
 Log decision points and checkpoints, not every action: a fork chosen, a unit completed with its verification result, a pivot or revert with its trigger, a blocker surfaced, a gate fixed. For loop runs, one row per iteration. Skip the trivial and self-evident.
 
-A run is one agent conversation, including its later turns and any summary of it. A pickup, a replacement agent, or a new chat starts a new run. When a run adds to a log that already has rows, its first row has phase `start`, and so does its first row after another run's `start` row. So a run that comes back to a log in a later turn first reads the log's last rows to see whether another run wrote since. A `start` row names the `ts` range of the rows before it that this run did not write, and its evidence names this run, such as its agent id. Use phase `start` for nothing else.
+A run is one agent conversation, including its later turns and any summary of it. A pickup, a replacement agent, or a new chat starts a new run. When a run adds to a log that already has rows, its first row has phase `start`, and so does its first row after another run's `start` row. So a run that comes back to a log in a later turn first reads the log's last rows to see whether another run wrote since. A `start` row names the `ts` range of the rows before it that this run did not write, and its evidence names this run, such as its thread id. Use phase `start` for nothing else.
 
 ## Where it lives
 
@@ -54,7 +56,7 @@ Commit it only when the work is ambitious enough that a reviewer needs the trail
 
 ## Audit the log against the transcript
 
-At the end of the run, before handing back, check the log told the truth. Read this run's transcript under the active workspace's `agent-transcripts/` directory (the system prompt names the path). Don't glob across `~/.cursor/projects/*/`. That reads unrelated private chats. Walk this run's rows against what actually happened. Each stretch of them begins at one of this run's `start` rows, or at the first row if this run created the log, and ends at the next `start` row of another run:
+At the end of the run, before handing back, check the log told the truth. Read this run's thread with `t3_thread_read` (`view: "activity"`, following `nextPosition` until `hasMore` is false and recovering truncated items with `itemId` plus `textOffset`). Find its id with `t3_thread_search` on the run's opening user prompt. Don't pass another project's `projectId`. That reads unrelated private chats. Walk this run's rows against what actually happened. Each stretch of them begins at one of this run's `start` rows, or at the first row if this run created the log, and ends at the next `start` row of another run:
 
 - Check that every row maps to a real decision or action.
 - Check that each row's evidence resolves and shows what the row claims.
@@ -64,7 +66,7 @@ Correct the log, not the story. The audit never edits or removes a row, even an 
 
 ## Cross-model review of the trail
 
-Before handing back, spawn a subagent on a different model family from the one that did the work. Self-review is not a substitute. The subagent reads the audit trail and the run's transcript, then flags what the user should pay attention to. Not a redo of the work, a scan for what's suboptimal or risky.
+Before handing back, spawn a `delegate_task` child titled `Trail reviewer` on a different model family from the one that did the work, picked from `orchestrator_capabilities`. Self-review is not a substitute. Its brief gives the log's absolute path and this run's thread id, and says "read-only: inspect only, no writes, no git commands" and "Do not delegate". The subagent reads the audit trail and the run's transcript (`t3_thread_read` with `view: "activity"`, following `nextPosition` until `hasMore` is false and recovering truncated items with `itemId` plus `textOffset`), then flags what the user should pay attention to. Not a redo of the work, a scan for what's suboptimal or risky.
 
 - Decisions logged with weak or absent evidence.
 - Verification steps skipped or claimed without proof in the transcript.

@@ -282,25 +282,21 @@ export type ProgressVerdict =
       readonly reason: "poll" | "whole-stack-sweep";
       readonly rows: NonEmpty<PrSnapshot>;
     })
-  | (Progress<"WAITING"> & {
-      readonly frontier: PrContext;
-      readonly reason:
-        | {
-            readonly kind: "pending-checks";
-            readonly pending: NonEmpty<PendingCheck>;
-          }
-        | { readonly kind: "merge-queue"; readonly unmergedCount: number };
-    })
   | (Progress<"ADVANCE", "queued-stack"> & {
       readonly merged: PrContext;
       readonly frontier: PrContext;
       readonly remaining: number;
-    })
-  | (Progress<"RETRY"> & {
-      readonly failure: QueryFailure;
-      readonly consecutiveFailures: number;
-      readonly retryInSeconds: number;
     });
+export type WaitingVerdict = Progress<"WAITING"> & {
+  readonly exitCode: 5;
+  readonly frontier: PrContext;
+  readonly reason:
+    | {
+        readonly kind: "pending-checks";
+        readonly pending: NonEmpty<PendingCheck>;
+      }
+    | { readonly kind: "merge-queue"; readonly unmergedCount: number };
+};
 export type BlockerVerdict =
   | (Terminal<"BLOCKER", 2> & {
       readonly blocker: Extract<
@@ -326,23 +322,9 @@ export type BlockerVerdict =
   | (Terminal<"BLOCKER", 7> & {
       readonly blocker: {
         readonly kind: "status-query";
-        readonly failures: number;
         readonly failure: QueryFailure;
       };
     });
-export type TimeoutVerdict = Terminal<"TIMEOUT", 5> & {
-  readonly reason:
-    | {
-        readonly kind: "pending-checks";
-        readonly pending: NonEmpty<PendingCheck>;
-      }
-    | { readonly kind: "status-unavailable"; readonly failure: QueryFailure }
-    | {
-        readonly kind: "queued-stack";
-        readonly frontier: PrContext;
-        readonly unmergedCount: number;
-      };
-};
 export type TerminalVerdict =
   | (Terminal<"STATUS", 0> & {
       readonly reason: "status-only";
@@ -360,14 +342,14 @@ export type TerminalVerdict =
       readonly queue: NonEmpty<PrContext>;
       readonly merged: NonEmpty<MergedPr>;
     })
-  | BlockerVerdict
-  | TimeoutVerdict;
-export type WatcherVerdict = ProgressVerdict | TerminalVerdict;
-export type ExitCode = TerminalVerdict["exitCode"];
-export type QueueTerminalVerdict =
+  | BlockerVerdict;
+export type RunVerdict = TerminalVerdict | WaitingVerdict;
+export type WatcherVerdict = ProgressVerdict | RunVerdict;
+export type ExitCode = RunVerdict["exitCode"];
+export type QueueVerdict =
   | Extract<TerminalVerdict, { readonly kind: "COMPLETE" }>
   | BlockerVerdict
-  | TimeoutVerdict;
+  | WaitingVerdict;
 export type ChecksFastPath =
   | { readonly kind: "checks"; readonly checks: readonly Check[] }
   | {
@@ -391,11 +373,4 @@ export interface GitHubReader {
   ): Promise<RollupPage>;
   reviewThreads(context: PrContext): Promise<readonly ReviewThread[]>;
   commitRollups(context: PrContext): Promise<readonly CommitRollup[]>;
-}
-export interface PollingOptions {
-  readonly interval: number;
-  readonly sweepInterval: number;
-  readonly timeout: number;
-  readonly maxQueryErrors: number;
-  readonly allowDraft: boolean;
 }
