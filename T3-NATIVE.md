@@ -22,6 +22,7 @@ Probed in T3 Code on 2026-10-10. Re-probe before changing a rule that rests on o
 | `disable-model-invocation: true` | Hidden from the model. The model cannot load it with its skill tool, and `/<name>` at the start of a `delegate_task` brief does not load it either | Ignored. Codex reads `agents/openai.yaml` instead |
 | `agents/openai.yaml` `policy.allow_implicit_invocation: false` | Ignored | Hidden from the skills list. `$<name>` still loads it, path included |
 | How the user runs a skill | `/<name>` | `$<name>` |
+| The same skill name installed globally and in the project | Not probed | `$<name>` loads neither copy (probed 2026-10-10), so install globally or per project, never both |
 | New project skills | Seen by a new session | Cached per workspace at the first scan in a running Codex: skills added later show up in a fresh workspace or after a restart |
 | `paths:` frontmatter | The skill stays out of the skill list ("Unknown skill") until the agent works on a matching file | Ignored |
 
