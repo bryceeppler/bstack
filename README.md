@@ -42,6 +42,7 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 | `/how` | You want a walkthrough of how a subsystem works. |
 | `/why` | You want to know why something was built this way, from every evidence source your MCP tools reach. |
 | `/recall` | You're starting or resuming work and want your recent context rebuilt from your own threads. |
+| `/ketchup` | You want everything in this chat since your last message, in plain words, with an executive summary for each action item so you can make the call. |
 | `/blast-radius` | A small-looking change might break something else, and you want the safety fact proven by running code. |
 | `/architect` | You're about to write code that crosses a function boundary and want its shape settled first. |
 | `/arena` | You want N parallel attempts at the same thing, then the best parts of each. |
