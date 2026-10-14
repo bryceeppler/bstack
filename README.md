@@ -39,10 +39,11 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 | `/poteto-mode` | Default entry point for any non-trivial task. |
 | `/poteto-help` | You're new to pstack, or unsure which skill, playbook, or principle fits. |
 | `/setup-pstack` | You want to pick which models pstack uses per role. |
+| `/in-your-own-words` | You want the agent to play back your goal and the problem before it starts. |
 | `/how` | You want a walkthrough of how a subsystem works. |
 | `/why` | You want to know why something was built this way, from every evidence source your MCP tools reach. |
 | `/recall` | You're starting or resuming work and want your recent context rebuilt from your own threads. |
-| `/ketchup` | You want everything in this chat since your last message, in plain words, with an executive summary for each action item so you can make the call. |
+| `/ketchup` | You want what changed in this chat since your last message, in a few plain sentences and small visuals, with just enough context on each action item to make the call. |
 | `/blast-radius` | A small-looking change might break something else, and you want the safety fact proven by running code. |
 | `/architect` | You're about to write code that crosses a function boundary and want its shape settled first. |
 | `/arena` | You want N parallel attempts at the same thing, then the best parts of each. |
