@@ -1,0 +1,73 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+:root{--gap:14px}
+body{font-family:var(--font-sans);color:var(--foreground);line-height:1.45;font-size:14px}
+h2{font-size:15px;margin:22px 0 8px;font-weight:600}
+h2:first-child{margin-top:0}
+p.note{color:var(--muted-foreground);margin:4px 0 10px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-weight:600;color:var(--muted-foreground);font-size:12px}
+td.m{text-align:center;width:46px;font-size:15px;white-space:nowrap}
+th.m{text-align:center;width:46px}
+.yes{color:var(--success)}.no{color:var(--destructive)}.cond{color:var(--warning)}.none{color:var(--muted-foreground);opacity:.5}
+tr.grp td{border-bottom:none;padding-top:14px;font-weight:600;font-size:12px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.04em}
+.sub{color:var(--muted-foreground);font-size:12px;display:block;margin-top:2px}
+.bars{display:grid;grid-template-columns:150px 1fr 70px;gap:6px 10px;align-items:center;font-size:13px}
+.bar{height:12px;border-radius:3px;background:var(--chart-1)}
+.track{background:var(--muted);border-radius:3px}
+.sizes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.size{border:1px solid var(--border);border-radius:var(--radius);padding:10px}
+.size b{display:block;font-size:12px;color:var(--muted-foreground);font-weight:600;margin-bottom:4px}
+.size .n{font-size:18px;font-weight:600}
+.size .s{font-size:12px;color:var(--muted-foreground)}
+.legend{font-size:12px;color:var(--muted-foreground);margin-bottom:6px}
+@media (max-width:520px){.sizes{grid-template-columns:repeat(2,1fr)}.bars{grid-template-columns:110px 1fr 56px}}
+</style></head><body>
+
+<h2>What the three reviewers proposed</h2>
+<div class="legend"><span class="yes">●</span> proposed &nbsp; <span class="cond">◐</span> agrees with conditions &nbsp; <span class="no">✕</span> argued against &nbsp; <span class="none">·</span> silent</div>
+<table>
+<tr><th>Change</th><th class="m">GPT</th><th class="m">Fable</th><th class="m">Grok</th></tr>
+
+<tr class="grp"><td colspan="4">All three agree</td></tr>
+<tr><td>Builders become T3 child tasks in worktrees. Finishing is the report; a fix, rebase or description fix is a follow-up message to the same child.<span class="sub">You already ruled this for Snapcaster on 2026-10-14. Removes "pushed and never reported" (runs 10, 11, and 81 to 96 idle minutes on 10-14).</span></td><td class="m yes">●</td><td class="m yes">●</td><td class="m cond">◐</td></tr>
+<tr><td>Hard word cap on the generated skills, checked by the build. No dated incident stories in skill text; situational sections (away, restart, red main, finish) load only when needed.<span class="sub">Coordinator 6,030 words today, chief of staff 3,763; pstack's whole orchestration playbook is 2,692. Agents broke rules the text already had: 39 of 41 heartbeats answered with a forbidden message.</span></td><td class="m yes">●</td><td class="m yes">●</td><td class="m yes">●</td></tr>
+<tr><td>Split rulings into a short standing-policy list and an archive. One-time merge approvals leave it; a ruling a lessons pass encodes moves to the archive. Give the store a history.<span class="sub">484 lines, read at every start, mostly one-off "merge it" lines; not under git.</span></td><td class="m yes">●</td><td class="m yes">●</td><td class="m yes">●</td></tr>
+<tr><td>Add a narrow code-quality bar to the review lane: a file pushed past ~1,000 lines, a second way to do something, a new special case in a shared flow, a cast where a type exists. Everything else becomes a follow-up issue.<span class="sub">Today no checker judges structure. Kept narrow so it can't recreate run 2's five rounds.</span></td><td class="m yes">●</td><td class="m yes">●</td><td class="m yes">●</td></tr>
+<tr><td>Fix three real bugs: the chief of staff reads "waiting" as "has a question"; retries aren't safe after a restart; Codex can start our skills on its own.</td><td class="m yes">●</td><td class="m yes">●</td><td class="m yes">●</td></tr>
+<tr><td>Turn prose rules into checks: a checker verdict must name the commit it judged, and every builder rule gets a row naming what enforces it.</td><td class="m yes">●</td><td class="m yes">●</td><td class="m cond">◐</td></tr>
+<tr class="grp"><td colspan="4">Two of three</td></tr>
+<tr><td>Delete the background watcher, its heartbeat turns and the "stay alive" sections; let ticks and child completions carry the run.<span class="sub">GPT: only after a test on your installed T3 proves outside merges and your own PR comments are still caught.</span></td><td class="m cond">◐</td><td class="m yes">●</td><td class="m yes">●</td></tr>
+<tr><td>When a review finding repeats an earlier round's theme, stop and ask you instead of opening another round.<span class="sub">Run 10's four-round docs ticket; firstmate's 15-round ticket.</span></td><td class="m yes">●</td><td class="m none">·</td><td class="m yes">●</td></tr>
+<tr><td>Recover a checker that wrote its verdict but stays open on a leftover process.</td><td class="m yes">●</td><td class="m none">·</td><td class="m yes">●</td></tr>
+
+<tr class="grp"><td colspan="4">One reviewer, worth weighing</td></tr>
+<tr><td>Fire the chief of staff's own tick as the doorbell, so nobody needs to know which chat is current.<span class="sub">Checked in T3's source: it queues into whichever chat the tick is bound to.</span></td><td class="m none">·</td><td class="m yes">●</td><td class="m none">·</td></tr>
+<tr><td>Coordinator merges small tickets itself now (trust ladder rung 2).<span class="sub">The two-week bar started 2026-10-06, so it is due 2026-10-20, not met yet.</span></td><td class="m no">✕</td><td class="m yes">●</td><td class="m no">✕</td></tr>
+<tr><td>One merge command that does claim, gate, merge and release; today a stuck claim is taken over after 15 minutes even if its holder resumes.</td><td class="m yes">●</td><td class="m none">·</td><td class="m none">·</td></tr>
+<tr><td>Ship tightly coupled issues as one PR with one review and one approval, instead of grouping unrelated tickets by folder.<span class="sub">Closer to poteto's "coordinate clusters" and your one-PR-per-change rule.</span></td><td class="m yes">●</td><td class="m none">·</td><td class="m none">·</td></tr>
+<tr><td>Post a "verified" status on the commit and make it a required check, so GitHub itself refuses an unverified merge.</td><td class="m none">·</td><td class="m none">·</td><td class="m yes">●</td></tr>
+<tr><td>Inbox "drain" marks rows done before the chief of staff has acted on them, so a turn cut short loses them.</td><td class="m yes">●</td><td class="m none">·</td><td class="m none">·</td></tr>
+<tr><td>Lessons pass records what it rejected, and a run counts as folded only when the PR merges.</td><td class="m yes">●</td><td class="m none">·</td><td class="m none">·</td></tr>
+<tr><td>Probe two open questions on your phone: does the 30-minute tick buzz it, and does auto-resume after a usage limit work through the proxy.</td><td class="m cond">◐</td><td class="m yes">●</td><td class="m cond">◐</td></tr>
+</table>
+
+<h2>Which checker finds real problems</h2>
+<p class="note">Share of verdicts with in-scope issues, all HzBook runs. Every reviewer says keep all three lanes.</p>
+<div class="bars">
+<div>GPT review</div><div class="track"><div class="bar" style="width:43%"></div></div><div>21 of 49</div>
+<div>Opus review</div><div class="track"><div class="bar" style="width:27%;background:var(--chart-2)"></div></div><div>14 of 51</div>
+<div>Live drive</div><div class="track"><div class="bar" style="width:20%;background:var(--chart-3)"></div></div><div>18 of 91</div>
+</div>
+
+<h2>If rebuilt from scratch</h2>
+<p class="note">All three keep the same shape: a chief of staff per product, a coordinator per run, your merge click, and the same refusing scripts. Nobody would adopt pstack, firstmate or a port.</p>
+<div class="sizes">
+<div class="size"><b>Today</b><div class="n">~4,600</div><div class="s">source lines</div><div class="n">~11,400</div><div class="s">words of skill text</div></div>
+<div class="size"><b>GPT</b><div class="n">2,150–3,050</div><div class="s">source lines</div><div class="n">~4,000</div><div class="s">words in entry skills</div></div>
+<div class="size"><b>Fable</b><div class="n">~2,500</div><div class="s">script lines</div><div class="n">~7,000</div><div class="s">words incl. briefs</div></div>
+<div class="size"><b>Grok</b><div class="n">~3,500</div><div class="s">script lines kept</div><div class="n">~4,000</div><div class="s">words, three skills</div></div>
+</div>
+
+</body></html>
