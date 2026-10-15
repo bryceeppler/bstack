@@ -40,6 +40,7 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 | `/poteto-help` | You're new to pstack, or unsure which skill, playbook, or principle fits. |
 | `/setup-pstack` | You want to pick which models pstack uses per role. |
 | `/in-your-own-words` | You want the agent to play back your goal and the problem before it starts. |
+| `/sharpen` | You want a task aimed higher before work starts: more expert, more outcome-focused, not overspecified. |
 | `/how` | You want a walkthrough of how a subsystem works. |
 | `/why` | You want to know why something was built this way, from every evidence source your MCP tools reach. |
 | `/recall` | You're starting or resuming work and want your recent context rebuilt from your own threads. |

@@ -32,7 +32,7 @@ Each reviewer gets the title `interrogate reviewer <label>`, a brief that says r
 
 If `delegate_task` rejects a configured entry, run that reviewer on the closest model of the same provider that `orchestrator_capabilities` lists and say so. Do not block the review on it. Never treat an alias entry as a rejected entry or apply the fallback to it.
 
-Read `references/reviewer-prompt.md` and fill in the same template for every reviewer with the stated intent, the diff or file contents, the rubric from `references/rubric.md`, and the code-quality lens from `references/code-quality-review.md`.
+Read `references/reviewer-prompt.md` and fill in the same template for every reviewer with the stated intent, the diff or file contents, the rubric from `references/rubric.md`, and the code-quality lens from `references/code-quality-review.md`. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 
 ## Step 4, Synthesize
 

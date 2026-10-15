@@ -22,7 +22,7 @@ For each candidate, read its first user message with `t3_thread_read`. Take the 
 
 One turn, three `delegate_task` calls, each with a `title` naming the lens and `target` from its role line below. Reviewers need MCP access to look up the tickets, chat threads, and observability traces the transcript references.
 
-Each reviewer and the synthesizer name a role line in `~/.config/pstack/pstack-models.md`. With no file or no line, the role runs on the parent model. Say so and suggest `/setup-pstack`. If `orchestrator_capabilities` does not list a configured entry, run that role on the parent model and say so.
+Each reviewer and the synthesizer name a role line in `~/.config/pstack/pstack-models.md`. With no file or no line, the role runs on the parent model. Say so and suggest `/setup-pstack`. If `orchestrator_capabilities` does not list a configured entry, run that role on the parent model and say so. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 
 | Lens | Role line | Prompt template |
 |---|---|---|

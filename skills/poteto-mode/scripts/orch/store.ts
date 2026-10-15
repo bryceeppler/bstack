@@ -1101,21 +1101,29 @@ function remoteRepository(url: string): RemoteRepository | null {
   };
 }
 
-function originRepository(repo: string): RemoteRepository {
-  let raw: string;
+function runGit({
+  args,
+  repo,
+}: {
+  args: readonly string[];
+  repo: string;
+}): string {
   try {
-    raw = execFileSync("git", ["remote", "get-url", "origin"], {
+    return execFileSync("git", args, {
       cwd: repo,
       encoding: "utf8",
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
-    });
+    }).trim();
   } catch (error) {
     throw new UserError(
-      `git remote get-url origin failed: ${errorMessage(error)}`
+      `git ${args.join(" ")} failed: ${errorMessage(error)}`
     );
   }
-  const url = raw.trim();
+}
+
+function originRepository(repo: string): RemoteRepository {
+  const url = runGit({ args: ["remote", "get-url", "origin"], repo });
   const origin = remoteRepository(url);
   if (origin === null) {
     throw new UserError(
@@ -1249,20 +1257,7 @@ function branchSha({
   branch: string;
   repo: string;
 }): string {
-  let raw: string;
-  try {
-    raw = execFileSync("git", ["rev-parse", branch], {
-      cwd: repo,
-      encoding: "utf8",
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch (error) {
-    throw new UserError(
-      `git rev-parse ${branch} failed: ${errorMessage(error)}`
-    );
-  }
-  const sha = raw.trim();
+  const sha = runGit({ args: ["rev-parse", branch], repo });
   if (!/^[0-9a-f]{40,64}$/i.test(sha)) {
     throw new UserError(`git rev-parse ${branch} returned an invalid SHA`);
   }
@@ -1288,14 +1283,14 @@ function validateFrontierPin({
   const extra = actual.filter((pr) => !expectedSet.has(pr));
   const drift: string[] = [];
   if (missing.length > 0) {
-    drift.push(`missing from chain: ${missing.join(",")}`);
+    drift.push(`missing from resolved chain: ${missing.join(",")}`);
   }
   if (extra.length > 0) {
-    drift.push(`extra in chain: ${extra.join(",")}`);
+    drift.push(`extra in resolved chain: ${extra.join(",")}`);
   }
   if (missing.length === 0 && extra.length === 0) {
     drift.push(
-      `order differs: expected ${expected.join(",")}; chain ${actual.join(",")}`
+      `order differs: expected ${expected.join(",")}; resolved ${actual.join(",")}`
     );
   }
   throw new UserError(`frontier pin mismatch: ${drift.join("; ")}`);

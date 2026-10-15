@@ -66,7 +66,7 @@ Correct the log, not the story. The audit never edits or removes a row, even an 
 
 ## Cross-model review of the trail
 
-Before handing back, spawn a `delegate_task` child titled `Trail reviewer` on a different model family from the one that did the work, picked from `orchestrator_capabilities`. Self-review is not a substitute. Its brief gives the log's absolute path and this run's thread id, and says "read-only: inspect only, no writes, no git commands" and "Do not delegate". The subagent reads the audit trail and the run's transcript (`t3_thread_read` with `view: "activity"`, following `nextPosition` until `hasMore` is false and recovering truncated items with `itemId` plus `textOffset`), then flags what the user should pay attention to. Not a redo of the work, a scan for what's suboptimal or risky.
+Before handing back, spawn a `delegate_task` child titled `Trail reviewer` on a different model family from the one that did the work, picked from `orchestrator_capabilities`. Self-review is not a substitute. Its brief gives the log's absolute path and this run's thread id, and says "read-only: inspect only, no writes, no git commands" and "Do not delegate". The subagent reads the audit trail and the run's transcript (`t3_thread_read` with `view: "activity"`, following `nextPosition` until `hasMore` is false and recovering truncated items with `itemId` plus `textOffset`), then flags what the user should pay attention to. Not a redo of the work, a scan for what's suboptimal or risky. Pick each subagent's reasoning level and fast or standard speed for the job, per the Subagents section of the **poteto-mode** skill.
 
 - Decisions logged with weak or absent evidence.
 - Verification steps skipped or claimed without proof in the transcript.
