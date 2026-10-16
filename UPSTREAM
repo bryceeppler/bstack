@@ -1,4 +1,4 @@
 repo=https://github.com/cursor/plugins.git
 path=pstack
-sha=850d7f2e9f5e55dff7eb00a0a479337fe79eb22f
+sha=f713f14203cd6420cec13cd7c55c32d598dbab68
 bundle=cursor-team-kit/skills/deslop
