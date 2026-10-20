@@ -118,6 +118,19 @@ interrogate reviewers: <entry>, <entry>, <entry>
 | "Never require Graphite (`gt`)" | "Never require `gt`." |
 | Transcript scope (`~/.cursor/projects/<workspace>/`) | `t3_thread_list` and `t3_thread_search` default to the calling thread's project. Pass another `projectId` only when the user asks: other projects hold unrelated private chats. |
 
+## Delivery
+
+bstack's PR rules differ from upstream on purpose.
+Each new head of a ready PR restarts CI on billed hosted runners, so bstack spends as few ready heads as it can.
+An upstream sync keeps these rules and drops incoming text that contradicts them.
+
+| Upstream | bstack |
+|---|---|
+| Prefer five narrow PRs to one large PR | One PR per shippable change. Stack only when each layer needs its own review before the next can proceed. |
+| Open every PR ready, never as a draft | Open a PR when its code is ready, and open it ready. A stack layer above the bottom and an unfinished integration branch stay drafts. |
+| A hand-built base-branch stack (`gh pr create --base`, `gh pr edit --base`, retarget after a merge) | `gh stack` per the `gh-stack` skill, and a layer lands with `gh stack merge <pr> --yes`. That skill is not in this repo. It installs beside these skills with the `github/gh-stack` extension. |
+| Autopilot-full gives each owner a PR to merge | One run branch per run. Owners open no PRs, the root lands each verified issue on the run branch, and the run opens one PR that merges with `gh pr merge --merge`. |
+
 ## Scripts
 
 - `watch-pr`: the one-shot GitHub merge verdict. No poll loop. `watch_pull_request` waits. A run reads GitHub once and prints the verdict last; `WAITING` (nothing to do until the next wake) exits 5.
