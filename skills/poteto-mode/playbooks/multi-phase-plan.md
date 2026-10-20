@@ -44,7 +44,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 ### Spawn owners
 
-- [ ] Spawn one owner per PR with the full lifecycle the execution playbook names.
+- [ ] Spawn one owner per item with the full lifecycle the execution playbook names.
 - [ ] Follow this dependency graph. Start dependent work only after its parent merges, or base it on the parent branch when the execution playbook stacks.
   - [ ] <PR id> and <PR id> are independent and first. Both branch from `main`.
   - [ ] <PR id> after <PR id>.
@@ -54,7 +54,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 ### PR mechanics, for every PR
 
 - [ ] `gh` is the forge. Never require `gt`.
-- [ ] Open the PR ready, never draft, per **Opening a PR**. Use `gh pr create --base <base-branch>`, then `link_pull_request` with the URL at once. A stack child targets its parent branch.
+- [ ] Open each PR per **Opening a PR**, then `link_pull_request` with the URL at once. Build a stack with `gh stack` per the `gh-stack` skill.
 - [ ] Run the repo's lint and typecheck once before the PR-facing push. Push with hooks on.
 - [ ] Run `/deslop` before each commit and `/no-comments` before review.
 - [ ] Triage every Bugbot and security-reviewer comment per `<skills dir>/poteto-mode/references/bugbot-triage.md`.
