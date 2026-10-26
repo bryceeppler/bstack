@@ -15,7 +15,7 @@ Call `orchestrator_capabilities` and keep the providers whose `canRunChildTask` 
 
 ### 2. Load current state
 
-The default role-to-model mapping is the rule in step 3(b), over the roles shown in step 5. If `~/.config/pstack/pstack-models.md` already exists, read it and treat its `# budget` line and its role values as the current choices. Otherwise start from those defaults. A line whose role is not in step 5, such as `how critics`, is from a retired role. Drop it.
+The default role-to-model mapping is the rule in step 3(b), over the roles shown in step 5. If `~/.config/pstack/pstack-models.md` already exists, read it and treat its `# budget` line and its role values as the current choices. Otherwise start from those defaults. A line above the first `## project` heading whose role is not in step 5, such as `how critics`, is from a retired role. Drop it. Keep every `## project <owner>/<repo>` section as it is, since it holds one repository's own choices, including roles step 5 does not list such as `owner small`.
 
 ### 3. Budget, map, and confirm
 
@@ -36,11 +36,12 @@ Every real entry written must be in the `orchestrator_capabilities` result. Its 
 
 ### 5. Write the file
 
-Write `~/.config/pstack/pstack-models.md` (create `~/.config/pstack/` if it is missing) as a plain file with the header comments, a `# budget` line with the chosen label and its target effort, and one line per role, using the same labels poteto-mode uses. Overwrite the whole file so re-runs stay idempotent. Shape:
+Write `~/.config/pstack/pstack-models.md` (create `~/.config/pstack/` if it is missing) as a plain file with the header comments, a `# budget` line with the chosen label and its target effort, and one line per role, using the same labels poteto-mode uses, then every `## project` section step 2 kept, unchanged. Overwrite the whole file so re-runs stay idempotent. Shape:
 
 ```
 # pstack model configuration. One line per role. Delete a line to fall back to the skill default.
 # `inherit-parent` or `auto` as a value: the role runs on the parent thread's model (omit delegate_task `target`). Alias entries in a panel list still count toward its fan-out.
+# A `## project <owner>/<repo>` section applies only in a checkout whose origin is that GitHub repository, and there its lines replace the same roles' lines above it.
 # budget: large (xhigh)
 feature, refactoring: <providerInstanceId>/<model> (<effort>)
 bug-fix: <entry>
