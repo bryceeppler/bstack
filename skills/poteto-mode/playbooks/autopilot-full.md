@@ -18,6 +18,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    GitHub CLI (`gh`) is the forge.
    Never require `gt`.
    Each owner is a `t3_thread_launch` thread on its own branch with a worktree `workspaceStrategy` off the run branch, its brief opening with the text of `../references/poteto-agent.md`, its placeholder replaced by the absolute path of poteto-mode's `SKILL.md`.
+   Its `modelSelection` comes, as configured, from the `owner small`, `owner standard` or `owner deep` role matching the issue's `complexity:*` label, and with no such line or label the owner runs on this thread's model.
    Commit first, because uncommitted edits do not reach a new worktree.
    Owners run in parallel, never stacked.
    Each builds, pushes only its own branch, opens no PR, and proves the change on the real artifact.
@@ -35,7 +36,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    A full swarm runs once, at the code-ready head.
    Another full swarm runs only for new behavior, a redesign, or a large new diff.
    A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head.
-   Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the live lane on the `swarm workers` model and the diff audit on this thread's model (omit `target`), so each issue is checked by both model families, never by its author, and its live proof never comes from the owner's model family.
+   Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the diff audit on this thread's model (omit `target`) and the live lane on the `swarm workers` model, or on this thread's model when the owner is of the `swarm workers` model's family, so no lane is the issue's author and its live proof never comes from the owner's model family.
    They re-run the gates, prove the load-bearing behavior live on the real surface per the Non-negotiables, and audit the diff.
    The verdict is not clean without the live lane, or before you audit the landing-ready report's receipts, because no lane trusts a claim it has not checked.
 
