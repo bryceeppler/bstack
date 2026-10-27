@@ -67,7 +67,7 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 | `/maintain-verification-skill` | Your verify skill's feature map has drifted from the app. |
 | `/create-formal-verification-skill` | You want a race, invariant, or other property that tests rarely reach formally verified, with a project-local skill to recheck it. |
 | `/maintain-formal-verification-skill` | The code a formal verification covers changed, and you want it back in line and each failure called drift or a bug. |
-| `/statechart` | You want how a system moves between states drawn as a chart checked by a TLA+ model, with each bug as a numbered path, or an agreed chart turned into a TLA+ skeleton. |
+| `/statechart` | You want how a system moves between states drawn as a chart checked by a TLA+ model, with the shortest path to each state that breaks a rule. |
 | `/unslop` | You're cleaning up writing. |
 | `/bro` | You want the last message restated in plain language. |
 | `/technical-writing` | Docs, RFCs, readmes, PR descriptions, commit messages. |
