@@ -10,7 +10,7 @@ npx skills add mariusflorescu/pstack-t3 -g -a claude-code -a codex
 
 This puts one copy of each skill in `~/.agents/skills/` (Codex reads it there) and a symlink in `~/.claude/skills/` (Claude Code reads it there). Update with `npx skills update -g`. Drop `-g` to install into a single project instead, but install one way or the other, not both: when a skill name exists in both `~/.agents/skills` and a project's `.agents/skills`, Codex resolves neither on `$<name>`.
 
-You also need `gh` (the only forge pstack uses) and [Bun](https://bun.sh) for the `orch` and `watch-pr` scripts.
+You also need `gh` (the only forge pstack uses) and [Bun](https://bun.sh) for the `watch-pr` script.
 
 ## Get started
 
@@ -79,7 +79,6 @@ The 24 `principle-*` skills are indexed inside `poteto-mode` and read by the oth
 - Every Cursor mechanism is swapped for its T3 equivalent per [T3-NATIVE.md](./T3-NATIVE.md). Everything else keeps upstream's wording.
 - The model config is a plain file at `~/.config/pstack/pstack-models.md` instead of a Cursor rule.
 - `watch-pr` gives a one-shot verdict. T3's PR watch does the waiting.
-- `orch` reads stack order from T3 instead of Graphite.
 - `deslop` is bundled from `cursor-team-kit`. The `poteto-agent` and Comment Sicko briefs live in the skills that use them.
 - Not ported: the benny Slack automations, the Cursor guide in `docs/`, and the Cursor plugin manifest.
 
