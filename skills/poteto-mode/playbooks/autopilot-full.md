@@ -29,19 +29,21 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Once self-proof is done and every finding is fixed, it reports landing-ready.
 
    Assume the thread dies.
-   Soon after starting, push and start a decision trail per the **show-me-your-work** skill in the root's store at `~/.local/state/pstack/orchestrate/<project-slug>/trails/`, outside any worktree, then push after every unit worth keeping.
+   Soon after starting, push and start a decision trail per the **show-me-your-work** skill in the root's store at `~/.local/state/pstack/orchestrate/<project-slug>/trails/`, outside any worktree, then push each finished unit before you start the next.
    Whoever spawns a subagent records its `delegate_task` taskId or thread id, state, and a stuck-after runtime from past runs of its kind in that store, so the root can probe it if the parent dies.
    Force-push only your own branch, with `--force-with-lease` pinned to the SHA you last pushed or took over, and on any push you did not make, stop and report to the root.
 4. **Swarm-verify once.**
    A full swarm runs once, at the code-ready head.
    Another full swarm runs only for new behavior, a redesign, or a large new diff.
-   A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head.
+   A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none.
    Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the diff audit on this thread's model (omit `target`) and the live lane on the `swarm workers` model, or on this thread's model when the owner is of the `swarm workers` model's family, so no lane is the issue's author and its live proof never comes from the owner's model family.
    They re-run the gates, prove the load-bearing behavior live on the real surface per the Non-negotiables, and audit the diff.
    The verdict is not clean without the live lane, or before you audit the landing-ready report's receipts, because no lane trusts a claim it has not checked.
 
-   Send every proven finding, whatever a lane labeled it, to the owner in one fix-forward, with a red test across every site with the same defect.
-   A defect trunk shows without the issue's commit is recorded against trunk and does not gate the issue, but one the commit copies or newly reaches is the commit's own.
+   Block an issue only for a problem you can show, with a failing run at the head or a doc line the commit made wrong.
+   A problem trunk already has doesn't block unless the commit copies it or newly reaches it.
+   Only a bug a user would hit, a failed gate, or a wrong shipped doc blocks, and everything else goes in a follow-up.
+   Send every blocking finding to the owner in one fix-forward, with a red test across every site with the same defect.
    Never push a fix yourself, because each branch has one writer.
    Replace a stuck owner instead.
 5. **Land each verified issue yourself, one at a time.**
@@ -80,4 +82,4 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    A hold reaches every owner as a zero-writes order, and the root pauses the audit schedule with `update_scheduled_task` (`enabled: false`).
    Each owner reports where it stands and keeps its brief until the operator releases it, and the release re-enables the schedule.
 
-**Reply:** catch the operator up per the **ketchup** skill, covering each issue's state and verdict, what landed on the run branch, the run PR's state, countersigns and why, and open operator gates, with links to the run PR and the trails.
+**Reply:** catch the operator up per the **ketchup** skill, covering each issue's state and verdict, what landed on the run branch, the run PR's state, countersigns and why, open operator gates, and parked follow-ups, with links to the run PR and the trails.
