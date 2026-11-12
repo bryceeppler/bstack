@@ -105,7 +105,7 @@ interrogate reviewers: <entry>, <entry>, <entry>
 | Cursor restart, "local agents are dead" | Threads, delegated tasks, schedules and PR watches persist across T3 restarts. Reattach with `t3_thread_list`, `task_status` and `list_thread_pull_requests`. |
 | `AskQuestion` | Ask plainly in the thread. Questions pending in other threads: `t3_pending_request_list`, `t3_pending_request_read`, `t3_pending_request_respond`. |
 | Cursor's todo list ("open a todolist") | The harness's task list (Claude Code's task tools, Codex's plan tool). Without one, a checklist file at `~/.local/state/pstack/checklists/<repo>-<branch>.md`. |
-| `control-ui`, `control-cli` (`cursor-team-kit`) | The project's own verification skill if it has one (see `create-verification-skill`). Otherwise `preview_*` for web UIs (`preview_recording_start` / `preview_recording_stop` for video), `device_*` for iOS and Android simulators, and the shell for CLIs and TUIs. |
+| `control-ui`, `control-cli` (`cursor-team-kit`) | The project's own verification skill if it has one (see `create-verification-skill`). Otherwise the `playwright-cli` skill for web UIs, or `preview_*` when the user needs to see or touch the browser (`preview_recording_start` / `preview_recording_stop` for video), `device_*` for iOS and Android simulators, and the shell for CLIs and TUIs. |
 | `deslop` from `cursor-team-kit` | The bundled `deslop` skill (`skills/deslop/`). |
 | `create-skill` (Cursor built-in) | The `skill-creator` skill when installed, otherwise the Authoring-a-skill playbook. |
 | Cursor's built-in `babysit` skill | Drop the reference. The Babysit playbook stands alone. |
