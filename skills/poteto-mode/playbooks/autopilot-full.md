@@ -21,10 +21,11 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Its `modelSelection` comes, as configured, from the `owner small`, `owner standard` or `owner deep` role matching the issue's `complexity:*` label, and with no such line or label the owner runs on this thread's model.
    Commit first, because uncommitted edits do not reach a new worktree.
    Owners run in parallel, never stacked.
+   At most five owners are live at once, one issue each, whatever the cluster size; a larger cluster starts its next owner as one lands or is dropped.
    Each builds, pushes only its own branch, opens no PR, and proves the change on the real artifact.
 
    The code is ready only after the slop-strip (the **deslop** skill (`/deslop`)) and the `/no-comments` pass, so the full swarm runs on finished code.
-   Then the owner squashes the issue to one commit, rebases it onto the run branch tip, runs the repo's checks for the touched paths, and reports the code-ready head.
+   Then the owner squashes the issue to one commit, rebases it onto the run branch tip, runs the repo's checks for the touched paths, never the full gate, and reports the code-ready head.
    Fix rounds amend that commit and report each new head.
    Once self-proof is done and every finding is fixed, it reports landing-ready.
 
@@ -37,7 +38,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Another full swarm runs only for new behavior, a redesign, or a large new diff.
    A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none.
    Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the diff audit on this thread's model (omit `target`) and the live lane on the `swarm workers` model, or on this thread's model when the owner is of the `swarm workers` model's family, so no lane is the issue's author and its live proof never comes from the owner's model family.
-   They re-run the gates, prove the load-bearing behavior live on the real surface per the Non-negotiables, and audit the diff.
+   They re-run the touched paths' checks, never the full gate, prove the load-bearing behavior live on the real surface per the Non-negotiables, and audit the diff.
    The verdict is not clean without the live lane, or before you audit the landing-ready report's receipts, because no lane trusts a claim it has not checked.
 
    Block an issue only for a problem you can show, with a failing run at the head or a doc line the commit made wrong.
@@ -51,18 +52,19 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    When the tip has moved, the owner rebases again, the patch-id rule decides whether the verdict survives, and a conflict resolution gets a single verifier per step 4.
    An issue that cannot be proven stays off the run branch and open, with the exact reason commented on it.
 6. **Prove the run together, then open its one PR.**
-   Once every issue has landed or been left open, merge current trunk into the run branch if it moved, run every check the repo's `AGENTS.md` names on its tip, and have one verifier that wrote none of it prove the issues together on that head.
-   Then open one PR to trunk, with a `Closes #<n>` line and its verdict for each landed issue and a line for each issue left open.
-   Open it as a draft only while a proof the run cannot produce itself is outstanding, and mark it ready once that proof passes.
+   Once every issue has landed or been left open, merge current trunk into the run branch if it moved, and open one PR to trunk as a draft, with a `Closes #<n>` line and its verdict for each landed issue and a line for each issue left open.
+   On its tip, run every check the repo's `AGENTS.md` names, which is the run's one full gate, and have one verifier that wrote none of it prove the issues together on that head.
+   Mark the PR ready exactly once, when that head has passed the checks, the gate, the together proof and any proof the run cannot produce itself, because each new head of a ready PR restarts billed CI.
    You babysit it per `playbooks/babysit.md`.
-   After it opens, push only fixes or a trunk merge step 7 calls for, and each new head needs a single verifier and green CI before it clears.
+   After it is ready, push only fixes or a trunk merge step 7 calls for, batched into one push, and each new head needs a single verifier, the touched paths' checks and green CI before it clears, not another full gate.
    With no issue landed, open no PR and report the run blocked.
 7. **Merge only what you verified, tested on the trunk it lands on.**
-   Green CI alone never authorizes a merge.
+   Green CI alone never authorizes a merge, and neither does a run grant that leaves the merge to the operator: then report the ready PR and stop.
    Right before merging, fetch trunk and ask whether its changes can affect the run, because merging trunk in for every move never ends.
    Merge trunk in when it conflicts, when the forge requires an up-to-date branch, or when trunk changed something the run calls or depends on.
    Otherwise merge.
    Merge with `gh pr merge <pr> --merge`, not a squash, so each issue stays one revertable commit on trunk.
+   Where trunk allows only squash merges, the run lands as one commit, so say in the PR body that a revert takes the whole run.
    Call `unwatch_pull_request` before you report.
 8. **Run the root layer.**
    Anything that loosens a gate, such as a raised budget or an allowlist entry, needs a verifier's proof and then your fresh countersign, because the owner is the one who wants green.
