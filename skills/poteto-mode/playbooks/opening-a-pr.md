@@ -21,12 +21,12 @@ Invoked at the end of every other playbook.
 
 After the sections, attach videos or screenshots when they prove a claim. Full SHAs, swarm or arena lane recitals, lever-correction essays, file-by-file checklists, and "CLEAN" verdicts go in a linked artifact, not the body.
 
-**Forge.** Use GitHub CLI (`gh`) for create, edit, view, and merge, and `watch_pull_request` to watch.
+**Forge.** Use GitHub CLI (`gh`) for create, edit, view, and merge, and the **babysit-pr** skill to wait on a PR.
 
 **Size and stacks.** One PR per shippable change, because every new head of a ready PR restarts billed CI. Work that merges together in one sitting is one PR, or one integration branch merged once. Stack only when each layer needs its own review before the next can proceed. Build and land a stack with `gh stack` per the `gh-stack` skill, never with `gh pr create --base <feature-branch>` or `gh pr merge`. Do not rebase a PR onto its base until it is next to merge.
 
 **Readiness.** Open a PR as a draft, because a draft runs no CI. Mark it ready exactly once, when its final head has passed the repo's local checks and its gate. After that, batch every fix into one push, because each new head of a ready PR restarts billed CI. A stack layer above the bottom stays a draft until the layer below merges, and an integration branch's PR stays a draft until the branch is complete and next to merge. Call `link_pull_request` with the PR URL at once, for every layer of a stack. Run `gh pr view <number>` before you refer to PR status.
 
-**Babysit.** Opening a PR does not start a babysit. Post the URL and keep building. Finish the phase or stack first. Run a separate babysit pass only when the user asks for one after the whole stack exists. A babysit for each new PR stalls the build and spends checks on commits later waves restart. Push back when feedback drifts from intent. Call `unwatch_pull_request` before you hand a PR back to the user.
+**Babysit.** Opening a PR does not start a babysit. Post the URL and keep building. Finish the phase or stack first. Run a separate babysit pass only when the user asks for one after the whole stack exists. A PR the thread's own finish condition needs green, ready or merged, such as a run PR, is waited on through the **babysit-pr** skill once it is ready. A babysit for each new PR stalls the build and spends checks on commits later waves restart. Push back when feedback drifts from intent. Call `unwatch_pull_request` before you hand a PR back to the user.
 
 A subagent that opens a PR runs `/deslop` and `/no-comments`, links the PR with `link_pull_request`, and reports the URL. It returns to the parent without babysitting. The parent links every returned PR URL to its own thread with `link_pull_request` too.

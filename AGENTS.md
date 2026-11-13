@@ -9,7 +9,7 @@ Before you edit anything under `skills/`, read [T3-NATIVE.md](./T3-NATIVE.md) in
 - Keep upstream wording wherever it is harness-neutral. Change only what names a Cursor mechanism.
 - Upstream names stay: `poteto-mode`, `poteto-help`, `setup-pstack`, role names, playbook names.
 - `node scripts/check-t3-native.mjs` must exit 0. Pass skill names to check a subset.
-- Script changes keep `bun test` and `bun run typecheck` green in `skills/poteto-mode/scripts`.
+- Script changes keep `bun test` green in `skills/poteto-mode/scripts`.
 - A delegated worker writes only the files its brief names and runs no git commands.
 
 ## Syncing upstream

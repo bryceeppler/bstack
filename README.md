@@ -10,7 +10,7 @@ npx skills add mariusflorescu/pstack-t3 -g -a claude-code -a codex
 
 This puts one copy of each skill in `~/.agents/skills/` (Codex reads it there) and a symlink in `~/.claude/skills/` (Claude Code reads it there). Update with `npx skills update -g`. Drop `-g` to install into a single project instead, but install one way or the other, not both: when a skill name exists in both `~/.agents/skills` and a project's `.agents/skills`, Codex resolves neither on `$<name>`.
 
-You also need `gh` (the only forge pstack uses) and [Bun](https://bun.sh) for the `watch-pr` script.
+You also need `gh` (the only forge pstack uses), Python 3 for `babysit-pr`'s `pr-wait`, and [Bun](https://bun.sh) for the script tests.
 
 ## Get started
 
@@ -24,7 +24,7 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 
 - **Delegation.** A subagent is a `delegate_task` child with the provider, model and effort of its role. Panel roles spawn one child per entry, so `/interrogate` can put Claude and GPT reviewers on the same diff. Children get only their brief, and their completions wake the parent.
 - **Worktrees.** A writer that needs its own tree is a `t3_thread_launch` thread with a worktree, one writer per worktree.
-- **PRs.** `gh` opens them, `link_pull_request` registers every layer, and `watch_pull_request` wakes the thread when checks finish, someone comments, or the branch conflicts. `watch-pr` turns each wake into a merge verdict.
+- **PRs.** `gh` opens them, `link_pull_request` registers every layer, and the `babysit-pr` skill does every wait: `watch_pull_request` wakes the thread when checks finish, someone comments, or the branch conflicts, one 30-minute backstop catches what the watch cannot see, and `pr-wait --check` turns each wake into a merge verdict.
 - **Cadence.** Hourly audits and other recurring work run through `schedule_task`.
 - **Both harnesses.** Almost every skill is user-only: `disable-model-invocation` hides it on Claude Code and `agents/openai.yaml` hides it on Codex. Skills reach each other by reading `../<name>/SKILL.md` from their own directory, and a brief hands a child the absolute path of any skill it must follow. Skills that create skills write to `.agents/skills/` and symlink `.claude/skills/`.
 
@@ -38,6 +38,7 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 |---|---|
 | `/poteto-mode` | Default entry point for any non-trivial task. |
 | `/poteto-help` | You're new to pstack, or unsure which skill, playbook, or principle fits. |
+| `/babysit-pr` | You want a PR watched through CI and review, and merged when you asked for a merge. Loads on its own whenever a thread waits on a PR. |
 | `/setup-pstack` | You want to pick which models pstack uses per role. |
 | `/in-your-own-words` | You want the agent to play back your goal and the problem before it starts. |
 | `/sharpen` | You want a prompt rewritten deeper, not bigger, before you send it. It returns the prompt and doesn't do the task. |
@@ -78,17 +79,17 @@ The 24 `principle-*` skills are indexed inside `poteto-mode` and read by the oth
 
 - Every Cursor mechanism is swapped for its T3 equivalent per [T3-NATIVE.md](./T3-NATIVE.md). Everything else keeps upstream's wording.
 - The model config is a plain file at `~/.config/pstack/pstack-models.md` instead of a Cursor rule.
-- `watch-pr` gives a one-shot verdict. T3's PR watch does the waiting.
+- `watch-pr` is replaced by `babysit-pr`, adapted from Theo Browne's [tstack](https://github.com/t3dotgg/tstack): T3's PR watch does the waiting, `pr-wait --check` gives the verdict, and one backstop covers what the watch cannot see.
 - `deslop` is bundled from `cursor-team-kit`. The `poteto-agent` and Comment Sicko briefs live in the skills that use them.
 - Not ported: the benny Slack automations, the Cursor guide in `docs/`, and the Cursor plugin manifest.
 
 ## Staying current with upstream
 
-`UPSTREAM` pins the upstream commit this port matches. To sync, diff `pstack/` in [cursor/plugins](https://github.com/cursor/plugins) from that commit to the new one, apply each hunk through T3-NATIVE.md, run `node scripts/check-t3-native.mjs` and the script tests (`bun test` in `skills/poteto-mode/scripts`), then bump the pin. [AGENTS.md](./AGENTS.md) holds the rules for agents doing this.
+`UPSTREAM` pins the upstream commit this port matches. To sync, diff `pstack/` in [cursor/plugins](https://github.com/cursor/plugins) from that commit to the new one, apply each hunk through T3-NATIVE.md, run `node scripts/check-t3-native.mjs` and the script tests (`bun test` in `skills/poteto-mode/scripts`), then bump the pin. `skills/babysit-pr` follows [tstack](https://github.com/t3dotgg/tstack)'s `skills/babysit-pr` from commit `11e37a7` instead. [AGENTS.md](./AGENTS.md) holds the rules for agents doing this.
 
 ## Credit
 
-Adapted from [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) by [Lauren Tan](https://x.com/poteto). `skills/deslop` comes from cursor/plugins `cursor-team-kit`. This port is not affiliated with Cursor or with the pstack author.
+Adapted from [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) by [Lauren Tan](https://x.com/poteto). `skills/deslop` comes from cursor/plugins `cursor-team-kit`. `skills/babysit-pr` comes from [tstack](https://github.com/t3dotgg/tstack) by Theo Browne. This port is not affiliated with Cursor or with the pstack author.
 
 ## License
 

@@ -55,7 +55,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Once every issue has landed or been left open, merge current trunk into the run branch if it moved, and open one PR to trunk as a draft, with a `Closes #<n>` line and its verdict for each landed issue and a line for each issue left open.
    On its tip, run every check the repo's `AGENTS.md` names, which is the run's one full gate, and have one verifier that wrote none of it prove the issues together on that head.
    Mark the PR ready exactly once, when that head has passed the checks, the gate, the together proof and any proof the run cannot produce itself, because each new head of a ready PR restarts billed CI.
-   You babysit it per `playbooks/babysit.md`.
+   You babysit it per `playbooks/babysit.md`, waiting through the **babysit-pr** skill.
    After it is ready, push only fixes or a trunk merge step 7 calls for, batched into one push, and each new head needs a single verifier, the touched paths' checks and green CI before it clears, not another full gate.
    With no issue landed, open no PR and report the run blocked.
 7. **Merge only what you verified, tested on the trunk it lands on.**
@@ -65,7 +65,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Otherwise merge.
    Merge with `gh pr merge <pr> --merge`, not a squash, so each issue stays one revertable commit on trunk.
    Where trunk allows only squash merges, the run lands as one commit, so say in the PR body that a revert takes the whole run.
-   Call `unwatch_pull_request` before you report.
+   Stop per the babysit-pr skill's Stopping, which unwatches the PR and deletes its backstop, before you report.
 8. **Run the root layer.**
    Anything that loosens a gate, such as a raised budget or an allowlist entry, needs a verifier's proof and then your fresh countersign, because the owner is the one who wants green.
    Under a grant that covers approvals, that countersign is the approval.

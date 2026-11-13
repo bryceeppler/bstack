@@ -2,7 +2,7 @@
 
 **You run the program, never the code. Decide which agent does each piece of work, then check what each one produces.** For a standing project handed to one coordinator chat: multi-day, many stacked PRs, dozens to hundreds of subagents, few human turns. One task driven to a predicate is Autonomous run. One ambitious run that needs a bespoke workflow is figure-it-out. Work that one agent could finish inside the session's budget is not a program.
 
-Run it with your own tools. Spawn workers with `delegate_task`, or with `t3_thread_launch` and a worktree `workspaceStrategy` for work that needs its own tree or branch. Keep the program's state in `notes.md` in the store at `~/.local/state/pstack/orchestrate/<project-slug>/`, outside any worktree, so threads in different worktrees share it. Link each PR to this thread with `link_pull_request` and watch it with `watch_pull_request`. Call no scripts, run no polling loops, and never relay messages or status between agents.
+Run it with your own tools. Spawn workers with `delegate_task`, or with `t3_thread_launch` and a worktree `workspaceStrategy` for work that needs its own tree or branch. Keep the program's state in `notes.md` in the store at `~/.local/state/pstack/orchestrate/<project-slug>/`, outside any worktree, so threads in different worktrees share it. Link each PR to this thread with `link_pull_request` and wait on it through the **babysit-pr** skill. Call no scripts, run no polling loops, and never relay messages or status between agents.
 
 #### Topology
 
