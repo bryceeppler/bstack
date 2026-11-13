@@ -22,7 +22,7 @@ Each tick re-reads both playbooks from the installed copy (`<poteto-mode dir>/pl
    Each link carries its verdict in its PR.
    Once landing starts, nobody writes to the chain except the post-merge restack that `playbooks/shipping.md` sanctions, because a second writer breaks a landing in flight.
    A mid-landing problem goes through you to the operator, and any fix waits for the operator's go.
-   At handoff, clear any watch you armed with `unwatch_pull_request`.
+   At handoff, clear any watch you armed with `unwatch_pull_request`, and delete the babysit-pr backstop.
 
 **Choosing between the autopilots.**
 Autopilot-full when the issues can merge together and landing authority is granted.

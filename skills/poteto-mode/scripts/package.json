@@ -3,14 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test watch-pr check-plan.test.ts",
-    "typecheck": "tsc --project watch-pr/tsconfig.json --noEmit --strict"
-  },
-  "dependencies": {
-    "commander": "14.0.0"
+    "test": "bun test check-plan.test.ts"
   },
   "devDependencies": {
-    "bun-types": "latest",
-    "typescript": "latest"
+    "bun-types": "latest"
   }
 }

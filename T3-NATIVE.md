@@ -32,7 +32,7 @@ Tool scope, from the T3 tool contracts:
 
 - `task_status` and `task_cancel` reach only tasks the calling thread created. Another thread's delegated work is found with `t3_thread_list` (`includeSubagents: true`) and read with `t3_thread_read`.
 - A `delegate_task` child cannot call `watch_pull_request`: its parent thread owns the PR. A `t3_thread_launch` thread is top-level and can watch. `watch_pull_request` and `unwatch_pull_request` take an optional `threadId`, so a root can arm or clear a watch for an owner thread.
-- A watch wakes the thread when a check fails, the required checks pass, someone else comments or reviews, or the branch starts to conflict. It ends when the PR merges or closes (a merge ends the watch without a wake), when its thread settles or is archived, or on `unwatch_pull_request`. A wake is news, not a merge decision.
+- A watch wakes the thread when a check fails, the required checks pass (again when a later required check passes), someone else comments or reviews, the branch starts to conflict, the merge queue drops the PR, or no check reports within 15 minutes of a push. It never wakes on a comment from the thread's own GitHub login, on a check stuck in the queue, or on a branch falling BEHIND. It ends when the PR merges or closes (a merge ends the watch without a wake), when its thread settles or is archived, or on `unwatch_pull_request`. A wake is news, not a merge decision. Read from the T3 source on 2026-11-13; the **babysit-pr** skill's backstop covers the gaps.
 - `link_pull_request` links to the calling thread.
 - Schedules persist until deleted. `update_scheduled_task` with `enabled: false` pauses one.
 
@@ -41,7 +41,7 @@ Tool scope, from the T3 tool contracts:
 - **A skill named in bold or in backticks, or run as `/<name>`, in agent-facing text** (`the **how** skill`, `**unslop**`, "Use `why` step 2", "Run `/deslop`") is the file `../<name>/SKILL.md`, resolved from the naming skill's base directory. A principle named without its prefix (`the **prove-it-works** principle skill`) is `../principle-<name>/SKILL.md`. Keep upstream's short form in the text. Read the file. Do not expect the harness's skill tool to load it: almost every pstack skill is user-only.
 - **Standalone skills.** Any skill can run without poteto-mode, so a skill that names another skill carries this sentence right after its title: "A skill named in bold or in backticks, or run as `/<name>`, is the file `../<name>/SKILL.md` beside this skill's directory, and a principle named without its prefix is `../principle-<name>/SKILL.md`. Read the file and follow it. Most pstack skills are user-only, so your skill tool cannot load them." A skill that delegates adds "Every `delegate_task` call follows the defaults in the Subagents section of `../poteto-mode/SKILL.md`." The checker enforces both. Principles and poteto-mode are exempt.
 - **Base directory.** Take it from the harness (see Harness facts). If the harness gave none, the global install puts skills in `~/.claude/skills/<name>/` on Claude Code and `~/.agents/skills/<name>/` on Codex.
-- **Scripts** run from the skill's base directory (`<poteto-mode dir>/scripts/watch-pr/watch-pr`). Upstream's repo-relative `pstack/skills/...` paths become base-directory paths.
+- **Scripts** run from the skill's base directory (`<babysit-pr dir>/scripts/pr-wait`). Upstream's repo-relative `pstack/skills/...` paths become base-directory paths.
 - **A brief that needs a child to follow a pstack skill** gives the absolute path of that `SKILL.md` and says to read it in full before any work. Never start a brief with `/<name>` or `$<name>`: the Claude Code probe showed it does not load a user-only skill. Give script paths as absolute paths too, since a child that never loaded the skill has no base directory.
 - **Skill text that tells the user to run a skill** keeps upstream's `/<name>`. The README says once that Codex threads type `$<name>`.
 - **User-only skills.** Keep `disable-model-invocation: true` in `SKILL.md` exactly where upstream has it. Each such skill also ships `agents/openai.yaml` with `policy.allow_implicit_invocation: false`, so Codex hides it the same way. The checker fails when the two disagree.
@@ -96,8 +96,8 @@ interrogate reviewers: <entry>, <entry>, <entry>
 | Resume, message or queue a follow-up on a subagent | A fresh `delegate_task` round. `t3_thread_send` only to a `t3_thread_launch` thread that holds needed state. |
 | Cloud agent, `environment: "cloud"`, cloud VM, background agent | A `delegate_task` child, or a `t3_thread_launch` thread with a worktree `workspaceStrategy` when it needs its own tree or branch. Everything runs on this machine. |
 | "each worker gets its own worktree" | `t3_thread_launch` with `workspaceStrategy` (`worktree`, `existing_worktree` with `worktreePath`, or `root`). |
-| `/loop`, polling loops, wake-ups | `watch_pull_request` for PR events (checks finish, comments, conflicts), `schedule_task` for a time cadence (`{"type":"interval","everyMs":...}` or `{"type":"fixed_time","timeOfDay":"09:00","weekdays":[1,2,3,4,5]}`), `run_scheduled_task_now` for an immediate tick. Child completions arrive as notifications. Arm it and end the turn. |
-| `scripts/watch-pr/watch-pr` as a blocking poller | `watch_pull_request` does the waiting. On each wake, `watch-pr` runs once and gives the verdict. |
+| `/loop`, polling loops, wake-ups | The **babysit-pr** skill for PR events (`watch_pull_request` plus its one backstop), `schedule_task` for a time cadence (`{"type":"interval","everyMs":...}` or `{"type":"fixed_time","timeOfDay":"09:00","weekdays":[1,2,3,4,5]}`), `run_scheduled_task_now` for an immediate tick. Child completions arrive as notifications. Arm it and end the turn. |
+| `scripts/watch-pr/watch-pr`, its queued-stack verdicts, and Shipping's 5-minute fallback check | Deleted. The **babysit-pr** skill waits and judges: `watch_pull_request` waits, its `pr-wait --check` gives each PR's verdict, and its one 30-minute backstop covers what the watch cannot see. Drop upstream changes to `watch-pr`, and map any upstream wait or verdict text to that skill. |
 | `gt` (Graphite) stack bookkeeping | `list_thread_pull_requests` (any `threadId`) for stack order and branches, `gh pr view` for head SHAs and state. `gh` is the forge. |
 | A run's built-in PR tool, `draft: false` | `gh pr create` (ready unless the playbook says draft), then `link_pull_request` with the URL at once, for every layer. `link_pull_request` links to the calling thread, so a child that opens a PR links it and reports the URL, and the parent links it too. `unwatch_pull_request` before handing a PR back to the user. |
 | Origin forge (`origin pr ...`, `command -v origin`) | `gh` only. |
@@ -134,12 +134,12 @@ An upstream sync keeps these rules and drops incoming text that contradicts them
 
 ## Scripts
 
-- `watch-pr`: the one-shot GitHub merge verdict. No poll loop. `watch_pull_request` waits. A run reads GitHub once and prints the verdict last; `WAITING` (nothing to do until the next wake) exits 5.
 - `worktree-audit.sh`: `--activity <tsv>` supplies the last T3 activity per worktree, built from `t3_thread_list` plus `t3_thread_read` (`worktreePath`, latest run). T3 worktrees live in `~/.t3/worktrees/<project>/`.
 - `check-plan.mjs`: its required markers follow the ported `multi-phase-plan.md`.
-- `bootstrap.ts`, `package.json`, `bun.lock`: unchanged. Bun installs `commander` beside the scripts on first run.
+- `package.json`, `bun.lock`: only the `check-plan` test remains, so `watch-pr`'s `bootstrap.ts`, `commander` and typecheck are gone.
+- `babysit-pr/scripts/pr-wait`: Theo Browne's tstack watcher, plus a one-shot `--check` verdict, review bots that gate only when named with `--bot`, and a green verdict for a head with no CI.
 
-`bun test` and `bun run typecheck` in `skills/poteto-mode/scripts` stay green.
+`bun test` in `skills/poteto-mode/scripts` stays green.
 
 ## Writing rules
 
