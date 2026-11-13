@@ -23,6 +23,10 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 ## How it works on T3
 
 - **Delegation.** A subagent is a `delegate_task` child with the provider, model and effort of its role. Panel roles spawn one child per entry, so `/interrogate` can put Claude and GPT reviewers on the same diff. Children get only their brief, and their completions wake the parent.
+- **Models.** bstack ships only defaults: the role names, the model file's format, and each role's built-in default.
+  Your choices live in `~/.config/pstack/pstack-models.md`, which `/setup-pstack` writes and which you can keep in a private config repo linked to that path.
+  A skill resolves each role in this order: the `## project <owner>/<repo>` section matching the checkout's `origin`, then the file's global line, then the skill's built-in default.
+  Each layer wins only for the roles it sets, so a short file overrides a few roles and leaves the rest on their defaults.
 - **Worktrees.** A writer that needs its own tree is a `t3_thread_launch` thread with a worktree, one writer per worktree.
 - **PRs.** `gh` opens them, `link_pull_request` registers every layer, and the `babysit-pr` skill does every wait: `watch_pull_request` wakes the thread when checks finish, someone comments, or the branch conflicts, one 30-minute backstop catches what the watch cannot see, and `pr-wait --check` turns each wake into a merge verdict.
 - **Cadence.** Hourly audits and other recurring work run through `schedule_task`.
