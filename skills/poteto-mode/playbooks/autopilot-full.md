@@ -15,6 +15,9 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    You are its only writer.
    A run holds only the cluster it was given.
 3. **Spawn one owner per issue, and keep its work where a replacement can find it.**
+   First check each issue against trunk yourself: read the code it names and search trunk's log for a merged change that already meets its acceptance criteria.
+   An issue trunk already satisfies gets no owner: comment the commit that satisfies it on the issue, leave closing it to the operator, and name it in the report.
+   An issue trunk satisfies in part goes to its owner narrowed to what is still missing.
    GitHub CLI (`gh`) is the forge.
    Never require `gt`.
    Each owner is a `t3_thread_launch` thread on its own branch with a worktree `workspaceStrategy` off the run branch, its brief opening with the text of `../references/poteto-agent.md`, its placeholder replaced by the absolute path of poteto-mode's `SKILL.md`.
@@ -57,7 +60,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    Mark the PR ready exactly once, when that head has passed the checks, the gate, the together proof and any proof the run cannot produce itself, because each new head of a ready PR restarts billed CI.
    You babysit it per `playbooks/babysit.md`, waiting through the **babysit-pr** skill.
    After it is ready, push only fixes or a trunk merge step 7 calls for, batched into one push, and each new head needs a single verifier, the touched paths' checks and green CI before it clears, not another full gate.
-   With no issue landed, open no PR and report the run blocked.
+   With no issue landed, open no PR and report the run blocked, or done when trunk already satisfied every issue.
 7. **Merge only what you verified, tested on the trunk it lands on.**
    Green CI alone never authorizes a merge, and neither does a run grant that leaves the merge to the operator: then report the ready PR and stop.
    Right before merging, fetch trunk and ask whether its changes can affect the run, because merging trunk in for every move never ends.
