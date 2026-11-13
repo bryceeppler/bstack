@@ -22,8 +22,8 @@ pr-wait <pr> [--repo owner/name] [--bot greptile|macroscope] --check
 
 It reads the PR twice, 10 seconds apart, prints one line and exits.
 
-- **0, ready:** the required checks passed on the current head, no review thread is unresolved, and the branch is neither BEHIND nor DIRTY. Also 0 when the PR merged.
-- **1, needs you:** a required check failed, the branch conflicts or is BEHIND, a review thread is unresolved, or the PR closed. The line says which.
+- **0, ready:** the required checks passed on the current head, no review thread is unresolved, and GitHub does not hold the merge (not BEHIND, DIRTY or BLOCKED). Also 0 when the PR merged.
+- **1, needs you:** a required check failed, the branch conflicts or is BEHIND, a review thread is unresolved, GitHub still BLOCKS a green PR (usually a required review, which is the user's step), or the PR closed. The line says which.
 - **3, waiting:** a required check is pending or has not started, or a `--bot` has not reviewed the head. The line names each pending check and how long it has run.
 
 Required checks come from the base branch's rulesets and branch protection, so a required check that has not started yet is pending, never green by omission.
@@ -31,6 +31,7 @@ A head with no checks at all, in a repo that requires none, counts as green 15 m
 Pass `--bot greptile` or `--bot macroscope` only in a repo that gates merges on that bot.
 
 This verdict is the merge gate.
+When you were asked to wait for a specific review, the PR is not ready until that review is on the current head: keep the watch and the backstop until it arrives.
 A T3 wake, a green check list or a bot summary is news, never a verdict.
 
 ## Waiting in T3 Code

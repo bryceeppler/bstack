@@ -14,7 +14,8 @@ Progress and errors that do not end the run go to stderr.
               the base branch requires none; a head with no checks at all
               counts as green 15 minutes after its commit)
   ready       green, every --bot reviewed the current head, no review thread is
-              unresolved, and the branch is not BEHIND (default)
+              unresolved, and GitHub neither holds the merge as BEHIND nor
+              BLOCKED (default)
   any-change  stop after the first poll that prints an event
 
 --check
@@ -25,7 +26,8 @@ Exit codes
   0  the --until condition is met (ready for --check), or the PR merged
   1  the condition cannot be met without action: a required check failed, the
      branch conflicts with its base, the PR closed, `ready` is blocked by
-     unresolved threads or a BEHIND branch, or GitHub stayed unreachable
+     unresolved threads, a BEHIND branch or a merge GitHub still BLOCKS (for
+     example on a required review), or GitHub stayed unreachable
   2  bad arguments, unknown PR, or another pr-wait already watches this PR
   3  --check only: still waiting on a pending or unstarted required check or on
      a --bot review of the current head
@@ -497,6 +499,7 @@ class Watcher:
         merge_state = pr["mergeStateStatus"]
         dirty_line = f"merge state is DIRTY: the branch conflicts with {base}, rebase it"
         behind_line = f"merge state is BEHIND: update the branch from {base} before merging"
+        blocked_line = f"merge state is BLOCKED on {head[:7]}: checks are green but a branch rule, usually a required review, still holds the merge"
         if merge_state != "UNKNOWN":
             if merge_state in ("BEHIND", "DIRTY") and self.state["merge_state"] != merge_state:
                 line = dirty_line if merge_state == "DIRTY" else behind_line
@@ -537,6 +540,8 @@ class Watcher:
                 self.finish(3, [f"waiting on {short} for {', '.join(missing)} to review: {summary}"])
             if green and merge_state == "BEHIND":
                 self.finish(1, [behind_line])
+            if green and merge_state == "BLOCKED":
+                self.finish(1, [blocked_line])
             if green:
                 self.finish(0, [f"ready on {short}: {summary}{self.behind(base, base_oid, head)}"])
             waiting_on = f"pending {', '.join(pending)}" if pending else "no checks reported yet" if not checks else "checks still registering"
@@ -558,6 +563,8 @@ class Watcher:
                     self.finish(1, [f"blocked by {len(unresolved)} unresolved threads on {short}: {' '.join(unresolved)}"])
                 if merge_state == "BEHIND":
                     self.finish(1, [behind_line])
+                if merge_state == "BLOCKED":
+                    self.finish(1, [blocked_line])
                 self.reported.add(checks_key)
                 self.finish(0, [f"ready on {short}: {summary}{self.behind(base, base_oid, head)}"])
         if all_done and (stable or self.baseline):
