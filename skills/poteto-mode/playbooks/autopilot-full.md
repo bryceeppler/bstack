@@ -40,7 +40,8 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    A full swarm runs once, at the code-ready head.
    Another full swarm runs only for new behavior, a redesign, or a large new diff.
    A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none.
-   Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the diff audit on this thread's model (omit `target`) and the live lane on the `swarm workers` model, or on this thread's model when the owner is of the `swarm workers` model's family, so no lane is the issue's author and its live proof never comes from the owner's model family.
+   Fan out independent verifiers at the code-ready SHA per the **swarm** skill, the diff audit and the live lane both on the `swarm workers` model, or on this thread's model when the owner is of that model's family, so no lane is the issue's author or of its model family.
+   A lane that falls back to the owner's family per the swarm skill's step 3 names the fallback in its verdict.
    They re-run the touched paths' checks, never the full gate, prove the load-bearing behavior live on the real surface per the Non-negotiables, and audit the diff.
    The verdict is not clean without the live lane, or before you audit the landing-ready report's receipts, because no lane trusts a claim it has not checked.
 
