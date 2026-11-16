@@ -131,6 +131,7 @@ An upstream sync keeps these rules and drops incoming text that contradicts them
 | Prefer five narrow PRs to one large PR | One PR per shippable change. Stack only when each layer needs its own review before the next can proceed. |
 | Open every PR ready, never as a draft | Open a PR when its code is ready, and open it ready. A stack layer above the bottom and an unfinished integration branch stay drafts. |
 | A hand-built base-branch stack (`gh pr create --base`, `gh pr edit --base`, retarget after a merge) | `gh stack` per the `gh-stack` skill, and a layer lands with `gh stack merge <pr> --yes`. That skill is not in this repo. It installs beside these skills with the `github/gh-stack` extension. |
+| A lone PR gets an independent verdict only when Shipping lands it | Every PR that changes product code gets one independent proof pass on its final head before it is marked ready, and its verdict goes in the PR body (Opening a PR, `references/proof-pass.md`). No second full pass by default. |
 | Autopilot-full gives each owner a PR to merge | One run branch per run. Owners open no PRs, the root lands each verified issue on the run branch, and the run opens one PR that merges with `gh pr merge --merge`. |
 
 ## Scripts
