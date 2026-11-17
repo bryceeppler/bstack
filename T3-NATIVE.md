@@ -6,7 +6,7 @@ Keep upstream wording wherever it is harness-neutral. Change only what names a C
 
 ## What reaches an agent
 
-`npx skills add mariusflorescu/pstack-t3 -g -a claude-code -a codex` copies each `skills/<name>/` directory into `~/.agents/skills/<name>/` (Codex reads it there) and symlinks `~/.claude/skills/<name>` to it (Claude Code reads it there). Nothing else in this repo reaches an agent: not this file, not `README.md`, not `scripts/`. A skill links only inside its own directory or to a sibling skill (`../<other-skill>/...`). Anything a skill needs at runtime lives under its own `references/`, `playbooks/` or `scripts/`.
+`npx skills add bryceeppler/bstack -g -a claude-code -a codex` copies each `skills/<name>/` directory into `~/.agents/skills/<name>/` (Codex reads it there) and symlinks `~/.claude/skills/<name>` to it (Claude Code reads it there). Nothing else in this repo reaches an agent: not this file, not `README.md`, not `scripts/`. A skill links only inside its own directory or to a sibling skill (`../<other-skill>/...`). Anything a skill needs at runtime lives under its own `references/`, `playbooks/` or `scripts/`.
 
 ## Harness facts
 
@@ -80,9 +80,9 @@ interrogate reviewers: <entry>, <entry>, <entry>
 - An entry is `<providerInstanceId>/<model>` with an optional `(<effort>)`, validated against `orchestrator_capabilities`. A model with no effort option takes no `(<effort>)`. `inherit-parent` (or `auto`) runs the role on the parent thread's model: omit `target`.
 - Pass an entry as `target: {"providerInstanceId": ..., "model": ..., "options": {"<effort option id>": "<effort>"}}`. The effort option id is the one `orchestrator_capabilities` lists for that model (`effort` on Claude, `reasoningEffort` on Codex).
 - `swarm workers` may list fallback entries after its first. Swarm and the Shipping verifier try them in order only when the entry before cannot start or cannot drive the lane's surface, and log each fallback.
-- The effort ladder is `max` > `xhigh` > `high` > `medium` > `low`. Options outside it (`ultra`, `ultracode`, `ultrathink`) are never chosen by a budget.
+- The effort ladder is `xhigh` > `high` > `medium` > `low`, and no role runs above `xhigh`. Options outside it (`max`, `ultra`, `ultracode`, `ultrathink`) are never chosen by a budget.
 - A role with no line keeps the skill's default. With no file at all, single roles run `inherit-parent`, and a panel role takes the parent model plus the strongest model of each other provider that `orchestrator_capabilities` reports with `canRunChildTask`, up to three entries. Say so in the reply and suggest `/setup-pstack`.
-- Role names stay exactly as upstream: `feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`, `hardest tasks`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `arena runners`, `arena cross-judge pool`, `swarm workers`, `architect runners`, `interrogate reviewers`. bstack adds `owner small`, `owner standard` and `owner deep`, which Autopilot-full reads for each owner's model.
+- Role names stay exactly as upstream: `feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`, `arena runners`, `arena cross-judge pool`, `swarm workers`, `interrogate reviewers`. A role upstream retires is retired here too. bstack adds `owner small`, `owner standard` and `owner deep`, which Autopilot-full reads for each owner's model.
 
 ## Translation table
 
@@ -90,9 +90,11 @@ interrogate reviewers: <entry>, <entry>, <entry>
 |---|---|
 | `Task` tool, "spawn a subagent", `subagent_type`, `run_in_background: true` | `delegate_task` per Delegation. |
 | `subagent_type: "poteto-agent"`, `agents/poteto-agent.md` | The brief opens with the text of `poteto-mode/references/poteto-agent.md`, its `<poteto-mode SKILL.md>` placeholder replaced by the absolute path. Routed skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) keep the briefs they prescribe. |
+| `skills/poteto-mode/worker.md`, "kickoff", a Project worker | The file keeps its place and upstream's word "kickoff", which is the child's brief. A Project worker is a `t3_thread_launch` thread. Its PR lines follow Delivery, not upstream. |
 | `agents/comment-sicko.md` | `no-comments/references/comment-sicko.md`, pasted verbatim at the top of the child's brief. |
 | `readonly: true`, "readonly strips MCP" | "read-only" in the brief. Mode stays inherited. |
 | Model slugs (`grok-*`, `claude-*-xhigh`, `gpt-*`), "default model X" | The role name ("your `bug-fix` model"), resolved per Model roles. |
+| A rule about one named model (Opus always runs fast, the Fable exception, a Gemini effort cap), a `# defaults: N` line and its migration of old default slugs | Dropped. Roles and `orchestrator_capabilities` decide the model, and speed follows poteto-mode's rule: standard speed passed explicitly, fast mode only when CI or trunk is red or a person is blocked. |
 | `/setup-pstack` rule, `~/.cursor/rules/pstack-models.mdc`, `alwaysApply` | `~/.config/pstack/pstack-models.md`, read on demand. |
 | Resume, message or queue a follow-up on a subagent | A fresh `delegate_task` round. `t3_thread_send` only to a `t3_thread_launch` thread that holds needed state. |
 | Cloud agent, `environment: "cloud"`, cloud VM, background agent | A `delegate_task` child, or a `t3_thread_launch` thread with a worktree `workspaceStrategy` when it needs its own tree or branch. Everything runs on this machine. |
@@ -129,7 +131,7 @@ An upstream sync keeps these rules and drops incoming text that contradicts them
 | Upstream | bstack |
 |---|---|
 | Prefer five narrow PRs to one large PR | One PR per shippable change. Stack only when each layer needs its own review before the next can proceed. |
-| Open every PR ready, never as a draft | Open a PR when its code is ready, and open it ready. A stack layer above the bottom and an unfinished integration branch stay drafts. |
+| Open every PR ready, never as a draft (Opening a PR, `worker.md`) | Open a PR as a draft and mark it ready once, when its final head has passed its checks, its gate and its proof pass. A stack layer above the bottom and an unfinished integration branch stay drafts. |
 | A hand-built base-branch stack (`gh pr create --base`, `gh pr edit --base`, retarget after a merge) | `gh stack` per the `gh-stack` skill, and a layer lands with `gh stack merge <pr> --yes`. That skill is not in this repo. It installs beside these skills with the `github/gh-stack` extension. |
 | A lone PR gets an independent verdict only when Shipping lands it | Every PR that changes product code gets one independent proof pass on its final head before it is marked ready, and its verdict goes in the PR body (Opening a PR, `references/proof-pass.md`). No second full pass by default. |
 | Autopilot-full gives each owner a PR to merge | One run branch per run. Owners open no PRs, the root lands each verified issue on the run branch, and the run opens one PR that merges with `gh pr merge --merge`. |
@@ -137,11 +139,10 @@ An upstream sync keeps these rules and drops incoming text that contradicts them
 ## Scripts
 
 - `worktree-audit.sh`: `--activity <tsv>` supplies the last T3 activity per worktree, built from `t3_thread_list` plus `t3_thread_read` (`worktreePath`, latest run). T3 worktrees live in `~/.t3/worktrees/<project>/`.
-- `check-plan.mjs`: its required markers follow the ported `multi-phase-plan.md`.
-- `package.json`, `bun.lock`: only the `check-plan` test remains, so `watch-pr`'s `bootstrap.ts`, `commander` and typecheck are gone.
+- `package.json`, `bun.lock`: gone. Upstream's only tests there cover `watch-pr`, which this repo deletes.
 - `babysit-pr/scripts/pr-wait`: Theo Browne's tstack watcher, plus a one-shot `--check` verdict, review bots that gate only when named with `--bot`, and a green verdict for a head with no CI.
 
-`bun test` in `skills/poteto-mode/scripts` stays green.
+`skills/statechart/scripts` matches upstream byte for byte, so its tests are upstream's to keep green.
 
 ## Writing rules
 

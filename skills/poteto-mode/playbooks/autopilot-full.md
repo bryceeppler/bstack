@@ -20,7 +20,7 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
    An issue trunk satisfies in part goes to its owner narrowed to what is still missing.
    GitHub CLI (`gh`) is the forge.
    Never require `gt`.
-   Each owner is a `t3_thread_launch` thread on its own branch with a worktree `workspaceStrategy` off the run branch, its brief opening with the text of `../references/poteto-agent.md`, its placeholder replaced by the absolute path of poteto-mode's `SKILL.md`.
+   Each owner is a `t3_thread_launch` thread on its own branch with a worktree `workspaceStrategy` off the run branch, its brief opening with the `worker.md` line and then the text of `../references/poteto-agent.md`, its placeholder replaced by the absolute path of poteto-mode's `SKILL.md`.
    Its `modelSelection` comes, as configured, from the `owner small`, `owner standard` or `owner deep` role matching the issue's `complexity:*` label, and with no such line or label the owner runs on this thread's model.
    Commit first, because uncommitted edits do not reach a new worktree.
    Owners run in parallel, never stacked.
