@@ -15,24 +15,23 @@ Call `orchestrator_capabilities` and keep the providers whose `canRunChildTask` 
 
 ### 2. Load current state
 
-The default role-to-model mapping is the rule in step 3(b), over the roles shown in step 5. If `~/.config/pstack/pstack-models.md` already exists, read it and treat its `# budget` line and its role values as the current choices. Otherwise start from those defaults. A line above the first `## project` heading whose role is not in step 5, such as `how critics`, is from a retired role. Drop it. Keep every `## project <owner>/<repo>` section as it is, since it holds one repository's own choices, including roles step 5 does not list such as `owner small`.
+The default role-to-model mapping is the rule in step 3(b), over the roles shown in step 5. If `~/.config/pstack/pstack-models.md` already exists, read it and treat its `# budget` line and its role values as the current choices. Otherwise start from those defaults. A line above the first `## project` heading whose role is not in step 5, such as `hardest tasks`, `architect runners`, `reflect tooling`, or `why investigators`, is from a retired role. Drop it. A `# budget: unlimited` line becomes `large`, and an effort above `xhigh` becomes `xhigh`, because no role runs above `xhigh`. Tell the user which values you replaced. Keep every `## project <owner>/<repo>` section as it is, since it holds one repository's own choices, including roles step 5 does not list such as `owner small`.
 
 ### 3. Budget, map, and confirm
 
-**(a) Ask for a budget.** Ask plainly in the thread. Offer these four options with these exact labels, and name the current budget when the file records one.
+**(a) Ask for a budget.** Ask plainly in the thread. Offer these three options with these exact labels, and name the current budget when the file records one. With no file, say that `large` matches the skill defaults.
 
-- `unlimited - max reasoning`
 - `large - xhigh reasoning`
 - `medium - high reasoning`
 - `small - medium reasoning`
 
-**(b) Apply it.** Build the working table from the skill defaults, and on a re-run keep any role you changed by model, list, or alias (`inherit-parent`, `auto`). By default, code roles (`feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`) and the `how explorer`, `why investigators`, `swarm workers`, and `reflect tooling` roles get the fastest strong coding model detected. `judgment and prose`, `hardest tasks`, `how explainer`, `why synthesizer`, and `reflect judgment, divergent, synthesizer` get the most capable model detected. Each panel role (`arena runners`, `arena cross-judge pool`, `architect runners`, `interrogate reviewers`) gets the most capable model of each distinct provider detected, up to three entries. `unlimited`, `large`, `medium`, and `small` set the effort of every real entry, panel entries included, to `max`, `xhigh`, `high`, or `medium`, on the ladder `max` > `xhigh` > `high` > `medium` > `low`. If the model does not list the target, use the highest ladder option at or below it that the model lists, else mark the role as needing a choice. Never pick an option off the ladder, such as `ultra`, `ultracode`, or `ultrathink`. A model with no effort option gets no `(<effort>)`. `inherit-parent` and `auto` do not change. So under `large`, a model that lists `low`, `medium`, `high`, and `max` gets `high`.
+**(b) Apply it.** Build the working table from the skill defaults, and on a re-run keep any role you changed by model, list, or alias (`inherit-parent`, `auto`). By default, the code roles (`feature, refactoring`, `bug-fix`, `perf-issue`, `hillclimb`), `judgment and prose`, and `swarm workers` get the most capable model detected. `arena runners` and `interrogate reviewers` get the most capable model of each distinct provider detected, up to three entries, and `arena cross-judge pool` gets the same list without the first provider's entry when another provider is detected. Each role has a target effort, which is its default's effort moved by the budget. The code roles and `judgment and prose` default to `xhigh`, and `swarm workers` and the panel roles default to `high`. `large` keeps it, `medium` lowers it one step, and `small` lowers it two steps, on the ladder `xhigh` > `high` > `medium` > `low`. No role runs above `xhigh`, and a target at the bottom of the ladder stays there. Set the effort of every real entry in the role, panel entries included, to the role's target. If the model does not list the target, use the highest ladder option at or below it that the model lists, else mark the role as needing a choice. Never pick an option off the ladder, such as `max`, `ultra`, `ultracode`, or `ultrathink`. A model with no effort option gets no `(<effort>)`. `inherit-parent` and `auto` do not change. So `medium` turns an `xhigh` default into `high` and a `high` default into `medium`.
 
-**(c) Show the roles and confirm.** Show every role with its model, marking any real entry not in the detected set as needing a choice. Also list each line step 2 dropped. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` (both mean: this role runs on the parent thread's model) as the options. Ask plainly in the thread. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena runs one judge. It tries only values from a family other than the parent's, in list order, so order it by preference. An `inherit-parent` or `auto` value never judges. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm. Its line may list fallback entries after the first, in order, which a worker uses only when the entry before cannot start.
+**(c) Show the roles and confirm.** Show every role with its model, marking any real entry not in the detected set as needing a choice. Also list each line step 2 dropped. Ask whether to accept as-is or change specific roles, offering the detected models at `xhigh` or below plus `inherit-parent` and `auto` (both mean: this role runs on the parent thread's model) as the options. Ask plainly in the thread. For panel roles (arena runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena runs one judge. It tries only values from a provider other than the parent's, in list order, so order it by preference. An `inherit-parent` or `auto` value never judges. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm. Its line may list fallback entries after the first, in order, which a worker uses only when the entry before cannot start.
 
 ### 4. Validate
 
-Every real entry written must be in the `orchestrator_capabilities` result. Its provider has `canRunChildTask` true, its model is listed under that provider, and its effort, when it has one, is one of that model's effort options. A model with no effort option has no `(<effort>)`. `inherit-parent` and `auto` always pass. If a chosen real entry is not available, stop and ask again.
+Every real entry written must be in the `orchestrator_capabilities` result. Its provider has `canRunChildTask` true, its model is listed under that provider, and its effort, when it has one, is one of that model's effort options at `xhigh` or below. A model with no effort option has no `(<effort>)`. `inherit-parent` and `auto` always pass. If a chosen real entry is not available, stop and ask again.
 
 ### 5. Write the file
 
@@ -48,17 +47,9 @@ bug-fix: <entry>
 perf-issue: <entry>
 hillclimb: <entry>
 judgment and prose: <entry>
-hardest tasks: <entry>
-how explorer: <entry>
-how explainer: <entry>
-why investigators: <entry>
-why synthesizer: <entry>
-reflect tooling: <entry>
-reflect judgment, divergent, synthesizer: <entry>
 arena runners: <entry>, <entry>, <entry>
-arena cross-judge pool: <entry>, <entry>, <entry>
+arena cross-judge pool: <entry>, <entry>
 swarm workers: <entry>
-architect runners: <entry>, <entry>, <entry>
 interrogate reviewers: <entry>, <entry>, <entry>
 ```
 

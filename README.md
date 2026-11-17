@@ -1,21 +1,21 @@
 # pstack for T3 Code
 
-pstack is an engineering skill library for coding agents. Lauren Tan ([poteto](https://x.com/poteto)) wrote it for Cursor: one mode skill that routes every task to a playbook, principles that ground each decision, and verification strict enough to parallelize with confidence. This repo ships it to [T3 Code](https://github.com/pingdotgg/t3code) as 52 skills that work in Claude Code and Codex threads alike, with every delegation running as a T3 child on the model you picked for that role.
+pstack is an engineering skill library for coding agents. Lauren Tan ([poteto](https://x.com/poteto)) wrote it for Cursor: one mode skill that routes every task to a playbook, principles that ground each decision, and verification strict enough to parallelize with confidence. This repo ships it to [T3 Code](https://github.com/pingdotgg/t3code) as 60 skills that work in Claude Code and Codex threads alike, with every delegation running as a T3 child on the model you picked for that role.
 
 ## Install
 
 ```bash
-npx skills add mariusflorescu/pstack-t3 -g -a claude-code -a codex
+npx skills add bryceeppler/bstack -g -a claude-code -a codex
 ```
 
 This puts one copy of each skill in `~/.agents/skills/` (Codex reads it there) and a symlink in `~/.claude/skills/` (Claude Code reads it there). Update with `npx skills update -g`. Drop `-g` to install into a single project instead, but install one way or the other, not both: when a skill name exists in both `~/.agents/skills` and a project's `.agents/skills`, Codex resolves neither on `$<name>`.
 
-You also need `gh` (the only forge pstack uses), Python 3 for `babysit-pr`'s `pr-wait`, and [Bun](https://bun.sh) for the script tests.
+You also need `gh` (the only forge pstack uses) and Python 3 for `babysit-pr`'s `pr-wait`.
 
 ## Get started
 
 1. Run `/setup-pstack`. It reads the providers and models T3 offers (`orchestrator_capabilities`), asks for a reasoning budget, and writes `~/.config/pstack/pstack-models.md`: one `role: provider/model (effort)` line per pstack role.
-2. Use `/poteto-mode` for anything that needs rigor. It picks one of 23 playbooks and runs the other skills as the steps need them.
+2. Use `/poteto-mode` for anything that needs rigor. It picks one of 22 playbooks and runs the other skills as the steps need them.
 3. Stuck, or unsure which skill fits? Ask `/poteto-help`.
 
 Codex threads run every skill as `$<name>` where this README and the skills write `/<name>`.
@@ -45,9 +45,9 @@ Codex threads run every skill as `$<name>` where this README and the skills writ
 | `/babysit-pr` | You want a PR watched through CI and review, and merged when you asked for a merge. Loads on its own whenever a thread waits on a PR. |
 | `/setup-pstack` | You want to pick which models pstack uses per role. |
 | `/in-your-own-words` | You want the agent to play back your goal and the problem before it starts. |
-| `/sharpen` | You want a prompt rewritten deeper, not bigger, before you send it. It returns the prompt and doesn't do the task. |
+| `/sharpen` | You want a prompt rewritten deeper, not bigger, before you send it. It returns the prompt, which asks the agent to prototype any choice an experiment can settle, and doesn't do the task. |
 | `/how` | You want a walkthrough of how a subsystem works. |
-| `/why` | You want to know why something was built this way, from every evidence source your MCP tools reach. |
+| `/why` | You want to know why something was built this way, answered from the commits and PR discussions that made it. |
 | `/recall` | You're starting or resuming work and want your recent context rebuilt from your own threads. |
 | `/ketchup` | You want what changed in this chat since your last message, in a few plain sentences and small visuals, with just enough context on each action item to make the call. |
 | `/ketchup-video` | You want a `/ketchup` catch-up as a short silent video of slides, with the waiting calls as text under it. |
@@ -90,11 +90,14 @@ The 24 `principle-*` skills are indexed inside `poteto-mode` and read by the oth
 
 ## Staying current with upstream
 
-`UPSTREAM` pins the upstream commit this port matches. To sync, diff `pstack/` in [cursor/plugins](https://github.com/cursor/plugins) from that commit to the new one, apply each hunk through T3-NATIVE.md, run `node scripts/check-t3-native.mjs` and the script tests (`bun test` in `skills/poteto-mode/scripts`), then bump the pin. `skills/babysit-pr` follows [tstack](https://github.com/t3dotgg/tstack)'s `skills/babysit-pr` from commit `11e37a7` instead. [AGENTS.md](./AGENTS.md) holds the rules for agents doing this.
+`UPSTREAM` pins the [cursor/plugins](https://github.com/cursor/plugins) commit this port matches.
+`scripts/sync-upstream.sh` three-way merges upstream's `pstack/` from that commit to its head, so git carries every change that touches no translated text and stops on the rest.
+Resolve those conflicts through T3-NATIVE.md, run `node scripts/check-t3-native.mjs`, and continue the cherry-pick, which bumps the pin.
+`skills/babysit-pr` follows [tstack](https://github.com/t3dotgg/tstack)'s `skills/babysit-pr` from commit `11e37a7` instead. [AGENTS.md](./AGENTS.md) holds the rules for agents doing this.
 
 ## Credit
 
-Adapted from [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) by [Lauren Tan](https://x.com/poteto). `skills/deslop` comes from cursor/plugins `cursor-team-kit`. `skills/babysit-pr` comes from [tstack](https://github.com/t3dotgg/tstack) by Theo Browne. This port is not affiliated with Cursor or with the pstack author.
+Adapted from [cursor/plugins pstack](https://github.com/cursor/plugins/tree/main/pstack) by [Lauren Tan](https://x.com/poteto). The T3 port and its translation contract come from [pstack-t3](https://github.com/mariusflorescu/pstack-t3) by Marius Florescu, which bstack forked. `skills/deslop` comes from cursor/plugins `cursor-team-kit`. `skills/babysit-pr` comes from [tstack](https://github.com/t3dotgg/tstack) by Theo Browne. This port is not affiliated with Cursor or with the pstack author.
 
 ## License
 
