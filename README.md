@@ -83,6 +83,7 @@ The 24 `principle-*` skills are indexed inside `poteto-mode` and read by the oth
 
 - Every Cursor mechanism is swapped for its T3 equivalent per [T3-NATIVE.md](./T3-NATIVE.md). Everything else keeps upstream's wording.
 - The model config is a plain file at `~/.config/pstack/pstack-models.md` instead of a Cursor rule.
+- Upstream's rules about named models, such as Opus always running fast, are not ported. Roles in the model file decide the model, and a child runs at standard speed unless the job is urgent.
 - `watch-pr` is replaced by `babysit-pr`, adapted from Theo Browne's [tstack](https://github.com/t3dotgg/tstack): T3's PR watch does the waiting, `pr-wait --check` gives the verdict, and one backstop covers what the watch cannot see.
 - A PR that changes product code gets one independent proof pass on its final head before it is marked ready, and the verdict goes in the PR body.
 - `deslop` is bundled from `cursor-team-kit`. The `poteto-agent` and Comment Sicko briefs live in the skills that use them.

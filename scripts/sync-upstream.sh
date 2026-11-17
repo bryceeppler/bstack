@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+shopt -s inherit_errexit
 
 usage="usage: scripts/sync-upstream.sh [<upstream commit>]
 
@@ -40,12 +41,14 @@ snapshot() {
   cp -a "$work/src/$bundle" "$tree/skills/"
   (cd "$tree" && rm -rf "${not_ported[@]}")
   sed "s/^sha=.*/sha=$sha/" "$pin" > "$tree/UPSTREAM"
-  GIT_INDEX_FILE="$work/index-$sha" git -C "$root" --work-tree="$tree" add -A
+  GIT_INDEX_FILE="$work/index-$sha" git -C "$root" --work-tree="$tree" add -f -A
   GIT_INDEX_FILE="$work/index-$sha" git -C "$root" write-tree
 }
 
-base=$(git -C "$root" commit-tree "$(snapshot "$old")" -m "pstack@$old")
-tip=$(git -C "$root" commit-tree "$(snapshot "$new")" -p "$base" \
+old_tree=$(snapshot "$old")
+new_tree=$(snapshot "$new")
+base=$(git -C "$root" commit-tree "$old_tree" -m "pstack@$old")
+tip=$(git -C "$root" commit-tree "$new_tree" -p "$base" \
   -m "sync upstream pstack ${old:0:7}..${new:0:7}" \
   -m "$(git -C "$work/src" log --format='%h %s' "$old..$new" -- "$path" "$bundle")")
 
