@@ -20,6 +20,7 @@ Show every finding by a run: a repro script, a focused test or a command, with i
 ## Limits
 
 - Read-only: inspect and run only. Git is for reading (`diff`, `log`, `show`). `gh` is for reading the PR and its issue. No commits, pushes, comments or config changes.
+- Run another commit's code in a detached worktree (`git worktree add --detach <dir> <sha>`), removed before you finish. Never export `GIT_DIR` or `GIT_WORK_TREE` around a run and never run tests in an exported tree: a test's `git init` under those variables rewrites the real repository's config.
 - Local runs only. Send no request to a production or staging service, a live third-party site or a paid API.
 - Keep runs focused: single test files, small scripts, and the repository's own per-worktree tooling when a repro needs a database or search cluster. Leave the full local gate and whole end-to-end suites alone.
 - Scratch files in the checkout (temporary tests, instrumentation) are fine. Save every repro script and its captured output in your evidence directory, then remove the scratch files so `git status` reads as you found it.
