@@ -58,6 +58,8 @@ The patch-id rule in `playbooks/shipping.md` can carry a lane's result.
 6. **Prove the run together, then open its one PR.**
    Once every issue has landed or been left open, merge current trunk into the run branch if it moved, and open one PR to trunk as a draft, with a `Closes #<n>` line and its verdict for each landed issue and a line for each issue left open.
    On its tip, run every check the repo's `AGENTS.md` names, which is the run's one full gate, and have one verifier that wrote none of it prove the issues together on that head.
+   Before you mark it ready, add a `## Review guide` section to the PR body for the operator who reviews it by hand, written for that head and naming its short SHA: **Start here** (the two to four files or commits to read first, in order, and why), **Risky commits** (each by short SHA and issue, with what could break in production, and the generated or fixture bulk to skim), and **Try by hand** (two to four checks the reviewer can run locally, never against a shared environment).
+   Keep it under 40 lines, and rewrite it whenever a later push changes what it names.
    Mark the PR ready exactly once, when that head has passed the checks, the gate, the together proof and any proof the run cannot produce itself, because each new head of a ready PR restarts billed CI.
    You babysit it per `playbooks/babysit.md`, waiting through the **babysit-pr** skill.
    After it is ready, push only fixes or a trunk merge step 7 calls for, batched into one push, and each new head needs a single verifier, the touched paths' checks and green CI before it clears, not another full gate.
